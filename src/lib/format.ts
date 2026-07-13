@@ -11,6 +11,17 @@ const dateFormat = new Intl.DateTimeFormat(undefined, {
   timeStyle: 'short',
 })
 
+/**
+ * True for missing/zero timestamps: gowa stores Go's zero time
+ * (0001-01-01) on chat rows created from contact sync before any
+ * message exists, and epoch 0 is equally meaningless to display.
+ */
+export function isZeroTime(iso: string | null | undefined): boolean {
+  if (!iso) return true
+  const millis = new Date(iso).getTime()
+  return Number.isNaN(millis) || millis <= 0
+}
+
 export function formatDate(iso: string): string {
   const date = new Date(iso)
   return Number.isNaN(date.getTime()) ? iso : dateFormat.format(date)

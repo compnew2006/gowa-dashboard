@@ -115,7 +115,14 @@ export function MessageView({ chat }: { chat: ChatInfo }) {
             <Loader2 className="size-5 animate-spin text-muted-foreground" />
           </div>
         ) : messages.length === 0 ? (
-          <p className="p-6 text-center text-sm text-muted-foreground">No messages</p>
+          <div className="flex flex-col gap-1 p-6 text-center text-sm text-muted-foreground">
+            <p>No messages stored for this chat yet.</p>
+            <p className="text-xs">
+              Messages appear here as they are sent or received, and as WhatsApp history sync
+              batches are processed after pairing. Contacts synced from your address book start
+              without message history.
+            </p>
+          </div>
         ) : (
           <div className="flex flex-col gap-2">
             {messages.map((message) => (

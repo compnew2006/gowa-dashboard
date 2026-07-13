@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
-import { formatDate } from '@/lib/format'
+import { formatDate, isZeroTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 25
@@ -82,7 +82,7 @@ export function ChatList({
                     {chat.name || chat.jid}
                   </span>
                   <span className="w-full truncate text-xs text-muted-foreground">
-                    {chat.last_message_time ? formatDate(chat.last_message_time) : chat.jid}
+                    {isZeroTime(chat.last_message_time) ? chat.jid : formatDate(chat.last_message_time)}
                   </span>
                 </button>
               </li>
