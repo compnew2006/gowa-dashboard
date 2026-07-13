@@ -4,7 +4,7 @@ Standalone web dashboard for [go-whatsapp-web-multidevice](https://github.com/al
 
 Built as a single self-contained HTML file — React 19, TypeScript, Vite, Tailwind CSS 4, shadcn/ui — following the architecture of [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) and its [Management Center](https://github.com/router-for-me/Cli-Proxy-API-Management-Center): the backend stays a pure API, the UI ships separately and connects to any gowa server.
 
-> **Status**: M0 scaffold. Feature milestones are tracked in the roadmap below.
+> **Status**: feature parity with the embedded dashboard (M0–M7 complete). Tag a `v*` release to publish `gowa-ui.html`.
 
 ## Ways to run it
 
@@ -62,11 +62,11 @@ CI asserts `dist/` contains exactly one file.
 
 - [x] **M0** — scaffold: single-file build, app shell, dark mode, CI/release workflows
 - [x] **M1** — connect screen, device manager, QR/pair-code login, logout/reconnect, WebSocket events
-- [ ] **M2** — send suite (message, image, file, video, sticker, contact, location, audio, poll, link, presence)
-- [ ] **M3** — message actions (delete, revoke, react, update, read, forward) + call reject
-- [ ] **M4** — groups (create, join, info, participants, settings, invite links)
-- [ ] **M5** — account (avatar, push name, privacy, contacts) + newsletters
-- [ ] **M6** — chats (list, message viewer, pin, disappearing timers)
-- [ ] **M7** — parity audit vs the embedded dashboard → v1.0.0
+- [x] **M2** — send suite (message, image, file, video, sticker, contact, location, audio, poll, link, presence)
+- [x] **M3** — message actions (delete, revoke, react, update, read, star, forward) + call reject
+- [x] **M4** — groups (create, join, info, participants, settings, invite links)
+- [x] **M5** — account (avatar, push name, privacy, contacts) + newsletters
+- [x] **M6** — chats (list, message viewer, composer, pin, archive, disappearing timers)
+- [x] **M7** — parity audit vs the embedded dashboard → v1.0.0
 
 Post-v1 backlog: device webhook editor, Chatwoot module, message star/unstar, chat archive, WebAuthn passkey flow.
