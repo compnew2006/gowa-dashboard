@@ -77,5 +77,6 @@ Every `v*` tag publishes exactly one asset named **`gowa-ui.html`** (plus a `.sh
 - [x] **M6** — chats (list, message viewer, composer, pin, archive, disappearing timers)
 - [x] **M7** — parity audit vs the embedded dashboard → v1.0.0
 - [x] **v1.1.0** — per-device webhook editor (URL, secret, events, TLS verify) on the device card
+- [x] **v1.1.1** — group participants viewer: table with admin badges + inline add/promote/demote/remove
 
 Still to do: Chatwoot config module, full WebAuthn passkey flow.

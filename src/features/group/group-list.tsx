@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { LogOut, RefreshCw, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { leaveGroup, listMyGroups, type MyGroup } from '@/api/group'
+import { ParticipantsDialog } from '@/features/group/participants-dialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +30,7 @@ export function GroupList() {
   const deviceId = useSelectedDevice()
   const queryClient = useQueryClient()
   const [leaveTarget, setLeaveTarget] = useState<MyGroup | null>(null)
+  const [participantsTarget, setParticipantsTarget] = useState<MyGroup | null>(null)
 
   const {
     data: groups,
@@ -107,7 +109,11 @@ export function GroupList() {
                 {group.Participants?.length ?? group.ParticipantCount ?? 0} participants
                 <span className="ml-auto">{formatDate(group.GroupCreated)}</span>
               </CardContent>
-              <CardFooter className="justify-end">
+              <CardFooter className="justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setParticipantsTarget(group)}>
+                  <Users className="size-4" />
+                  Participants
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -122,6 +128,11 @@ export function GroupList() {
           ))}
         </div>
       )}
+
+      <ParticipantsDialog
+        group={participantsTarget}
+        onOpenChange={(open) => !open && setParticipantsTarget(null)}
+      />
 
       <AlertDialog open={!!leaveTarget} onOpenChange={(open) => !open && setLeaveTarget(null)}>
         <AlertDialogContent>
