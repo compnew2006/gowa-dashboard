@@ -1,29 +1,30 @@
 # gowa-ui
 
-Standalone web dashboard for [go-whatsapp-web-multidevice](https://github.com/aldinokemal/go-whatsapp-web-multidevice) (gowa).
+A web dashboard for [go-whatsapp-web-multidevice](https://github.com/aldinokemal/go-whatsapp-web-multidevice) (gowa).
 
-Built as a single self-contained HTML file — React 19, TypeScript, Vite, Tailwind CSS 4, shadcn/ui — following the architecture of [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) and its [Management Center](https://github.com/router-for-me/Cli-Proxy-API-Management-Center): the backend stays a pure API, the UI ships separately and connects to any gowa server.
+The whole app builds into **one HTML file** with no external dependencies. Host it anywhere (or just open it in a browser) and point it at your gowa server. The backend stays a pure API; the UI ships separately — same idea as [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) and its [Management Center](https://github.com/router-for-me/Cli-Proxy-API-Management-Center).
 
-> **Status**: feature parity with the embedded dashboard (M0–M7 complete). Tag a `v*` release to publish `gowa-ui.html`.
+Built with React 19, TypeScript, Vite, Tailwind CSS 4, and shadcn/ui.
 
-## Ways to run it
+> **Status**: feature parity with gowa's embedded dashboard. Tagging a `v*` release publishes `gowa-ui.html`.
 
-1. **Served by gowa** — gowa downloads the latest `gowa-ui.html` release asset and serves it at `/` (planned backend integration; lands with the parity cutover).
-2. **Self-hosted / GitHub Pages** — host the built file anywhere static and connect it to your server (URL + basic-auth credentials, stored in `localStorage`).
-3. **Local file** — download `gowa-ui.html` from a release and open it in a browser (some browser APIs need an HTTP origin; hosting is recommended for daily use).
+## How to use it
 
-## Backend requirements
+Pick one:
 
-A gowa server with the cross-origin enablers (CORS `Authorization`/`X-Device-Id` headers, `GET /app/info`, WebSocket query auth):
+1. **Served by gowa** — gowa downloads the latest `gowa-ui.html` release and serves it at `/`. (Planned; lands with the parity cutover.)
+2. **Host it yourself** — put the built file on any static host (GitHub Pages works). On first load, enter your server URL and basic-auth credentials; they're saved in `localStorage`.
+3. **Open the file directly** — download `gowa-ui.html` from a release and open it in a browser. Works, but some browser APIs need an HTTP origin, so hosting is better for daily use.
 
-- REST auth: `Authorization: Basic <base64(user:pass)>` header.
-- Device targeting: `X-Device-Id` header (URL-encoded) or `?device_id=` query.
-- WebSocket: `/ws?device_id=<id>&authorization=<base64(user:pass)>` — browsers cannot set headers on WebSocket connections, so the credential rides the query string. Use TLS.
-- Server metadata: `GET /app/info` (version, media size limits).
+## What your gowa server needs
 
-## Release contract
+The dashboard talks to gowa from the browser, so the server needs a few cross-origin features:
 
-Every `v*` tag publishes exactly one release asset named **`gowa-ui.html`** (plus a `.sha256` checksum). The gowa backend consumes `releases/latest` by that exact asset name, verifies the digest, caches it, and serves it at `/`.
+- **CORS** — allow the `Authorization` and `X-Device-Id` headers.
+- **REST auth** — `Authorization: Basic <base64(user:pass)>` header.
+- **Device selection** — `X-Device-Id` header (URL-encoded) or `?device_id=` query.
+- **WebSocket auth** — `/ws?device_id=<id>&authorization=<base64(user:pass)>`. Browsers can't set headers on WebSocket connections, so the credential goes in the query string — use TLS.
+- **Server info** — `GET /app/info` (version, media size limits).
 
 ## Development
 
@@ -33,13 +34,26 @@ npm install
 npm run dev
 ```
 
-Connect directly to `http://localhost:3000` (requires a gowa build with the CORS enablers), or use the same-origin dev proxy: point the connect screen at `http://localhost:5173/gowa`, which forwards to `VITE_DEFAULT_SERVER_URL` (WebSocket included).
+Then connect the app to your server, either way:
+
+- **Directly** — enter `http://localhost:3000` on the connect screen (needs a gowa build with the CORS features above).
+- **Via the dev proxy** — enter `http://localhost:5173/gowa` instead; Vite forwards everything (WebSocket included) to `VITE_DEFAULT_SERVER_URL`, so CORS doesn't matter.
 
 Other scripts: `npm run build` (single-file production build into `dist/index.html`), `typecheck`, `lint`, `format`, `preview`.
 
-### Logo assets
+### Single-file rules
 
-The brand asset is [`src/views/assets/gowa.svg`](https://github.com/aldinokemal/go-whatsapp-web-multidevice/blob/main/src/views/assets/gowa.svg) in the backend repo — an SVG wrapper around embedded 1024px rasters (~864 KB), too heavy to inline. The bundled copies are rasterized from it; to regenerate after a branding change:
+The build must stay one file with zero external requests:
+
+- No `import()` or `React.lazy` — code splitting breaks single-file output.
+- No CDN scripts, external fonts, or remote images — everything is bundled and inlined.
+- `HashRouter` only — it survives `file://` and any mount path.
+
+CI checks that `dist/` contains exactly one file.
+
+### Regenerating the logo
+
+The source logo lives in the backend repo: [`src/views/assets/gowa.svg`](https://github.com/aldinokemal/go-whatsapp-web-multidevice/blob/main/src/views/assets/gowa.svg). It's ~864 KB (an SVG wrapping embedded 1024px rasters), so we don't inline it — we bundle rasterized copies instead. To regenerate them after a branding change:
 
 ```bash
 rsvg-convert -w 128 -h 128 gowa.svg -o /tmp/gowa-logo.png
@@ -48,15 +62,9 @@ rsvg-convert -w 64 -h 64 gowa.svg -o /tmp/gowa-favicon.png     # then re-embed a
                                                                # base64 favicon in index.html
 ```
 
-### Single-file constraints
+## Releases
 
-The build must stay one file with zero external requests:
-
-- no `import()` / `React.lazy` (code splitting breaks single-file output)
-- no CDN scripts, external fonts, or remote images — everything is bundled and inlined
-- `HashRouter` only (survives `file://` and any mount path)
-
-CI asserts `dist/` contains exactly one file.
+Every `v*` tag publishes exactly one asset named **`gowa-ui.html`** (plus a `.sha256` checksum). The gowa backend fetches `releases/latest` by that exact name, verifies the checksum, caches the file, and serves it at `/`. Don't rename the asset.
 
 ## Roadmap
 
@@ -70,4 +78,4 @@ CI asserts `dist/` contains exactly one file.
 - [x] **M7** — parity audit vs the embedded dashboard → v1.0.0
 - [x] **v1.1.0** — per-device webhook editor (URL, secret, events, TLS verify) on the device card
 
-Post-v1 backlog: Chatwoot config module, full WebAuthn passkey flow.
+Still to do: Chatwoot config module, full WebAuthn passkey flow.
