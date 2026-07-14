@@ -10,51 +10,49 @@ import {
   unstarMessage,
   updateMessage,
 } from '@/api/message'
-import { RecipientField, type RecipientValue } from '@/components/shared/recipient-field'
 import { ResultPanel } from '@/components/shared/result-panel'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useActionMutation } from '@/hooks/use-action-mutation'
-import { composeJid } from '@/lib/jid'
+import { useRecipientJid } from '@/stores/recipient'
 
-/** Shared shell: message id + recipient + optional extra fields, submit, result. */
+export interface MessageActionProps {
+  messageId: string
+}
+
+/** Shared shell: submit + result. Recipient and message ID come from the workspace. */
 function MessageActionForm<TData>({
+  messageId,
   submitLabel,
   successMessage,
   run,
   children,
   extraValid = true,
-}: {
+}: MessageActionProps & {
   submitLabel: string
   successMessage: string
   run: (messageId: string, phone: string) => Promise<TData>
   children?: ReactNode
   extraValid?: boolean
 }) {
-  const [messageId, setMessageId] = useState('')
-  const [recipient, setRecipient] = useState<RecipientValue>({ phone: '', type: 'user' })
+  const jid = useRecipientJid()
   const mutation = useActionMutation((vars: { messageId: string; phone: string }) =>
     run(vars.messageId, vars.phone),
   )
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
-    mutation.mutate({ messageId: messageId.trim(), phone: composeJid(recipient.phone, recipient.type) })
+    mutation.mutate({ messageId: messageId.trim(), phone: jid })
   }
 
   return (
     <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-      <div className="flex flex-col gap-2">
-        <Label>Message ID</Label>
-        <Input value={messageId} onChange={(event) => setMessageId(event.target.value)} required />
-      </div>
-      <RecipientField value={recipient} onChange={setRecipient} showStatus />
       {children}
       <Button
         type="submit"
-        disabled={mutation.isPending || !messageId.trim() || !extraValid}
+        disabled={mutation.isPending || !messageId.trim() || !jid || !extraValid}
         className="self-start"
       >
         {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
@@ -65,10 +63,11 @@ function MessageActionForm<TData>({
   )
 }
 
-export function ReactForm() {
+export function ReactForm({ messageId }: MessageActionProps) {
   const [emoji, setEmoji] = useState('')
   return (
     <MessageActionForm
+      messageId={messageId}
       submitLabel="Send reaction"
       successMessage="Reaction sent"
       extraValid={emoji.trim().length > 0}
@@ -86,10 +85,11 @@ export function ReactForm() {
   )
 }
 
-export function UpdateForm() {
+export function UpdateForm({ messageId }: MessageActionProps) {
   const [message, setMessage] = useState('')
   return (
     <MessageActionForm
+      messageId={messageId}
       submitLabel="Update message"
       successMessage="Message updated"
       extraValid={message.trim().length > 0}
@@ -103,9 +103,10 @@ export function UpdateForm() {
   )
 }
 
-export function DeleteForm() {
+export function DeleteForm({ messageId }: MessageActionProps) {
   return (
     <MessageActionForm
+      messageId={messageId}
       submitLabel="Delete for everyone"
       successMessage="Message deleted"
       run={(id, phone) => deleteMessage(id, { phone })}
@@ -113,9 +114,10 @@ export function DeleteForm() {
   )
 }
 
-export function RevokeForm() {
+export function RevokeForm({ messageId }: MessageActionProps) {
   return (
     <MessageActionForm
+      messageId={messageId}
       submitLabel="Revoke message"
       successMessage="Message revoked"
       run={(id, phone) => revokeMessage(id, { phone })}
@@ -123,9 +125,10 @@ export function RevokeForm() {
   )
 }
 
-export function ReadForm() {
+export function ReadForm({ messageId }: MessageActionProps) {
   return (
     <MessageActionForm
+      messageId={messageId}
       submitLabel="Mark as read"
       successMessage="Marked as read"
       run={(id, phone) => markRead(id, { phone })}
@@ -133,10 +136,11 @@ export function ReadForm() {
   )
 }
 
-export function StarForm() {
+export function StarForm({ messageId }: MessageActionProps) {
   const [starred, setStarred] = useState(true)
   return (
     <MessageActionForm
+      messageId={messageId}
       submitLabel={starred ? 'Star message' : 'Unstar message'}
       successMessage={starred ? 'Message starred' : 'Message unstarred'}
       run={(id, phone) => (starred ? starMessage(id, { phone }) : unstarMessage(id, { phone }))}
@@ -163,15 +167,16 @@ export function StarForm() {
   )
 }
 
-export function ForwardForm() {
+export function ForwardForm({ messageId }: MessageActionProps) {
   const [reupload, setReupload] = useState(false)
   return (
     <MessageActionForm
+      messageId={messageId}
       submitLabel="Forward message"
       successMessage="Message forwarded"
       run={(id, phone) => forwardMessage(id, { phone, force_reupload: reupload })}
     >
-      <label className="flex items-center gap-2 text-sm text-muted-foreground">
+      <label className="text-muted-foreground flex items-center gap-2 text-sm">
         <input
           type="checkbox"
           checked={reupload}

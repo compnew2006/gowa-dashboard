@@ -35,12 +35,12 @@ export function MessageMedia({ message }: { message: MessageInfo }) {
   }
 
   if (query.isLoading) {
-    return <Loader2 className="mt-1 size-4 animate-spin text-muted-foreground" />
+    return <Loader2 className="text-muted-foreground mt-1 size-4 animate-spin" />
   }
 
   if (query.isError || !query.data) {
     return (
-      <p className="mt-1 text-xs text-destructive">
+      <p className="text-destructive mt-1 text-xs">
         {query.error ? toApiError(query.error).message : 'Download failed'}
       </p>
     )
@@ -58,7 +58,7 @@ export function MessageMedia({ message }: { message: MessageInfo }) {
       ) : type === 'audio' ? (
         <audio src={src} controls />
       ) : (
-        <a href={src} target="_blank" rel="noreferrer" className="text-sm text-primary underline">
+        <a href={src} target="_blank" rel="noreferrer" className="text-primary text-sm underline">
           {query.data.filename || 'Download file'}
         </a>
       )}

@@ -25,11 +25,11 @@ export function NewsletterList() {
   })
 
   if (isLoading) return <Skeleton className="h-24" />
-  if (error) return <p className="text-sm text-destructive">{toApiError(error).message}</p>
+  if (error) return <p className="text-destructive text-sm">{toApiError(error).message}</p>
 
   const items = data?.data ?? []
   if (items.length === 0)
-    return <p className="text-sm text-muted-foreground">No newsletters followed.</p>
+    return <p className="text-muted-foreground text-sm">No newsletters followed.</p>
 
   return (
     <ul className="flex flex-col divide-y">
@@ -39,7 +39,7 @@ export function NewsletterList() {
             <p className="truncate font-medium">
               {item.thread_metadata?.name?.text || item.id.split('@')[0]}
             </p>
-            <p className="truncate text-xs text-muted-foreground">
+            <p className="text-muted-foreground truncate text-xs">
               {item.viewer_metadata?.role ?? 'guest'}
               {' · '}
               {formatCreation(item.thread_metadata?.creation_time)}

@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Smartphone } from 'lucide-react'
+import { EmptyState } from '@/components/shared/empty-state'
+import { PageHeader } from '@/components/shared/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { CreateDeviceDialog } from '@/features/devices/create-device-dialog'
@@ -17,19 +19,15 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Devices</h1>
-          <p className="text-sm text-muted-foreground">
-            WhatsApp accounts connected to this server
-          </p>
-        </div>
-        <CreateDeviceDialog />
-      </div>
+      <PageHeader
+        title="Devices"
+        description="WhatsApp accounts connected to this server"
+        actions={<CreateDeviceDialog />}
+      />
 
       {error && (
         <Card className="border-destructive/50">
-          <CardContent className="py-4 text-sm text-destructive">
+          <CardContent className="text-destructive py-4 text-sm">
             Failed to load devices: {toApiError(error).message}
           </CardContent>
         </Card>
@@ -43,15 +41,11 @@ export default function DashboardPage() {
       )}
 
       {devices && devices.length === 0 && (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
-            <Smartphone className="size-8 text-muted-foreground" />
-            <p className="font-medium">No devices yet</p>
-            <p className="text-sm text-muted-foreground">
-              Add a device slot, then pair it with your phone via QR or pairing code.
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={Smartphone}
+          title="No devices yet"
+          hint="Add a device slot, then pair it with your phone via QR or pairing code."
+        />
       )}
 
       {devices && devices.length > 0 && (

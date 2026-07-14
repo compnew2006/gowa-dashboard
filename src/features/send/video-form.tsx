@@ -2,17 +2,16 @@ import { useState, type FormEvent } from 'react'
 import { Loader2 } from 'lucide-react'
 import { sendVideo } from '@/api/send'
 import { FileOrUrlInput, type FileOrUrl } from '@/components/shared/file-or-url-input'
-import { RecipientField, type RecipientValue } from '@/components/shared/recipient-field'
 import { ResultPanel } from '@/components/shared/result-panel'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useActionMutation } from '@/hooks/use-action-mutation'
-import { composeJid } from '@/lib/jid'
+import { useRecipientJid } from '@/stores/recipient'
 
 export function SendVideoForm() {
-  const [recipient, setRecipient] = useState<RecipientValue>({ phone: '', type: 'user' })
+  const jid = useRecipientJid()
   const [source, setSource] = useState<FileOrUrl>({ url: '' })
   const [caption, setCaption] = useState('')
   const [viewOnce, setViewOnce] = useState(false)
@@ -24,7 +23,7 @@ export function SendVideoForm() {
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
     mutation.mutate({
-      phone: composeJid(recipient.phone, recipient.type),
+      phone: jid,
       file: source.file,
       fileUrl: source.url || undefined,
       caption,
@@ -38,7 +37,6 @@ export function SendVideoForm() {
 
   return (
     <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-      <RecipientField value={recipient} onChange={setRecipient} showStatus />
       <FileOrUrlInput label="Video" accept="video/*" value={source} onChange={setSource} />
       <div className="flex flex-col gap-2">
         <Label htmlFor="video-caption">Caption</Label>
@@ -60,7 +58,7 @@ export function SendVideoForm() {
         <Switch checked={gifPlayback} onCheckedChange={setGifPlayback} />
         GIF playback
       </label>
-      <Button type="submit" disabled={mutation.isPending} className="self-start">
+      <Button type="submit" disabled={mutation.isPending || !jid} className="self-start">
         {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
         Send video
       </Button>

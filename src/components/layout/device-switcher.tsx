@@ -34,8 +34,8 @@ export function DeviceSwitcher() {
 
   return (
     <Select value={selectedDeviceId ?? undefined} onValueChange={selectDevice}>
-      <SelectTrigger size="sm" className="w-44 md:w-56">
-        <Smartphone className="size-4 shrink-0 text-muted-foreground" />
+      <SelectTrigger size="sm" className="w-36 sm:w-44 md:w-56">
+        <Smartphone className="text-muted-foreground size-4 shrink-0" />
         <SelectValue placeholder="Select device" />
       </SelectTrigger>
       <SelectContent>

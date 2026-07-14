@@ -1,12 +1,7 @@
 import { useTheme } from 'next-themes'
+import { PageHeader } from '@/components/shared/page-header'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Select,
   SelectContent,
@@ -28,6 +23,11 @@ export default function SettingsPage() {
 
   return (
     <div className="flex max-w-2xl flex-col gap-4">
+      <PageHeader
+        title="Settings"
+        description="Dashboard connection, server info, and appearance."
+      />
+
       <Card>
         <CardHeader>
           <CardTitle>Connection</CardTitle>

@@ -98,7 +98,7 @@ export function LoginCodeDialog({
               {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
               {copied ? 'Copied' : 'Copy code'}
             </Button>
-            <p className="text-center text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-center text-sm">
               Enter this code on your phone — waiting for pairing…
             </p>
           </div>

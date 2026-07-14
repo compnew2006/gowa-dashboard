@@ -3,13 +3,7 @@ import { Loader2 } from 'lucide-react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { Logo } from '@/components/layout/logo'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useConnection, type TestResult } from '@/stores/connection'
@@ -51,10 +45,14 @@ export default function ConnectPage() {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+    <div className="bg-background relative flex min-h-svh items-center justify-center overflow-hidden p-4">
+      <div
+        aria-hidden
+        className="bg-[radial-gradient(ellipse_at_top,--theme(--color-primary/12%),transparent_60%)] pointer-events-none absolute inset-0"
+      />
+      <Card className="animate-in fade-in slide-in-from-bottom-2 relative w-full max-w-md duration-500">
         <CardHeader>
-          <Logo className="mb-2" />
+          <Logo className="mb-2 [&_img]:size-10 [&_span]:text-xl" />
           <CardTitle>Connect to your gowa server</CardTitle>
           <CardDescription>
             The server URL and optional basic-auth credentials are stored in this browser only.
@@ -93,14 +91,14 @@ export default function ConnectPage() {
                 />
               </div>
             </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p className="text-destructive text-sm">{error}</p>}
             {status === 'unauthorized' && !error && (
-              <p className="text-sm text-destructive">
+              <p className="text-destructive text-sm">
                 The stored credentials were rejected — enter them again.
               </p>
             )}
             {status === 'unreachable' && !error && (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 The stored server was unreachable — check it and reconnect.
               </p>
             )}

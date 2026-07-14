@@ -1,17 +1,16 @@
 import { useState, type FormEvent } from 'react'
 import { Loader2 } from 'lucide-react'
 import { sendText } from '@/api/send'
-import { RecipientField, type RecipientValue } from '@/components/shared/recipient-field'
 import { ResultPanel } from '@/components/shared/result-panel'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useActionMutation } from '@/hooks/use-action-mutation'
-import { composeJid } from '@/lib/jid'
+import { useRecipientJid } from '@/stores/recipient'
 
 export function SendTextForm() {
-  const [recipient, setRecipient] = useState<RecipientValue>({ phone: '', type: 'user' })
+  const jid = useRecipientJid()
   const [message, setMessage] = useState('')
   const [replyId, setReplyId] = useState('')
 
@@ -20,7 +19,7 @@ export function SendTextForm() {
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
     mutation.mutate({
-      phone: composeJid(recipient.phone, recipient.type),
+      phone: jid,
       message,
       reply_message_id: replyId || undefined,
     })
@@ -28,7 +27,6 @@ export function SendTextForm() {
 
   return (
     <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-      <RecipientField value={recipient} onChange={setRecipient} showStatus />
       <div className="flex flex-col gap-2">
         <Label htmlFor="text-message">Message</Label>
         <Textarea
@@ -47,7 +45,7 @@ export function SendTextForm() {
           onChange={(event) => setReplyId(event.target.value)}
         />
       </div>
-      <Button type="submit" disabled={mutation.isPending} className="self-start">
+      <Button type="submit" disabled={mutation.isPending || !jid} className="self-start">
         {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
         Send message
       </Button>

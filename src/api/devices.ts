@@ -28,7 +28,9 @@ export async function loginDevice(deviceId: string): Promise<LoginQr> {
 }
 
 export async function loginDeviceWithCode(deviceId: string, phone: string): Promise<PairCode> {
-  return results(http.post(`/devices/${enc(deviceId)}/login/code`, undefined, { params: { phone } }))
+  return results(
+    http.post(`/devices/${enc(deviceId)}/login/code`, undefined, { params: { phone } }),
+  )
 }
 
 export async function logoutDevice(deviceId: string): Promise<void> {

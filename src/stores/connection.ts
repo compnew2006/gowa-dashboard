@@ -6,11 +6,7 @@ import { basicAuthHeader } from '@/lib/api-error'
 import { normalizeBaseUrl, sameOriginBaseUrl } from '@/lib/url'
 
 export type ConnectionStatus =
-  | 'booting'
-  | 'unconfigured'
-  | 'connected'
-  | 'unauthorized'
-  | 'unreachable'
+  'booting' | 'unconfigured' | 'connected' | 'unauthorized' | 'unreachable'
 
 export type TestResult = 'ok' | 'unauthorized' | 'not-gowa' | 'unreachable'
 
@@ -91,7 +87,7 @@ export const useConnection = create<ConnectionState>()(
         // Zero-config: the page may be served by gowa itself. The browser
         // replays cached basic-auth credentials on same-origin requests.
         const origin = sameOriginBaseUrl()
-        if (await probeServer(origin) === 'ok') {
+        if ((await probeServer(origin)) === 'ok') {
           set({ baseUrl: origin, status: 'connected' })
           return
         }

@@ -13,20 +13,23 @@ export function ContactsView() {
   })
 
   if (isLoading) return <Skeleton className="h-32" />
-  if (error) return <p className="text-sm text-destructive">{toApiError(error).message}</p>
+  if (error) return <p className="text-destructive text-sm">{toApiError(error).message}</p>
 
   const contacts = data?.data ?? []
   if (contacts.length === 0)
-    return <p className="text-sm text-muted-foreground">No contacts synced.</p>
+    return <p className="text-muted-foreground text-sm">No contacts synced.</p>
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-xs text-muted-foreground">{contacts.length} contacts</p>
+      <p className="text-muted-foreground text-xs">{contacts.length} contacts</p>
       <ul className="max-h-72 divide-y overflow-y-auto rounded-md border">
         {contacts.map((contact) => (
-          <li key={contact.jid} className="flex items-center justify-between gap-4 px-3 py-2 text-sm">
+          <li
+            key={contact.jid}
+            className="flex items-center justify-between gap-4 px-3 py-2 text-sm"
+          >
             <span className="truncate">{contact.name || '—'}</span>
-            <span className="font-mono text-xs text-muted-foreground">
+            <span className="text-muted-foreground font-mono text-xs">
               {contact.jid.split('@')[0]}
             </span>
           </li>

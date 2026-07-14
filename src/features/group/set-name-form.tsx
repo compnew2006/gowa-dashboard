@@ -8,9 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useActionMutation } from '@/hooks/use-action-mutation'
 
-export function SetNameForm() {
+export function SetNameForm({ groupJid }: { groupJid: string }) {
   const queryClient = useQueryClient()
-  const [groupId, setGroupId] = useState('')
   const [name, setName] = useState('')
 
   const mutation = useActionMutation(setGroupName, {
@@ -20,21 +19,11 @@ export function SetNameForm() {
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
-    mutation.mutate({ group_id: groupId, name })
+    mutation.mutate({ group_id: groupJid, name })
   }
 
   return (
     <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="set-name-group-id">Group ID</Label>
-        <Input
-          id="set-name-group-id"
-          placeholder="120363xxxxxxxxxxxx@g.us"
-          value={groupId}
-          onChange={(event) => setGroupId(event.target.value)}
-          required
-        />
-      </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="set-name-value">New name</Label>
         <Input

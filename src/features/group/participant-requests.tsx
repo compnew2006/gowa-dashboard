@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { type FormEvent } from 'react'
 import { Check, Loader2, X } from 'lucide-react'
 import {
   approveParticipantRequests,
@@ -6,8 +6,6 @@ import {
   rejectParticipantRequests,
 } from '@/api/group'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { useActionMutation } from '@/hooks/use-action-mutation'
 import { formatDate } from '@/lib/format'
 
@@ -16,9 +14,7 @@ function shortId(jid: string): string {
   return jid.split('@')[0]
 }
 
-export function ParticipantRequests() {
-  const [groupId, setGroupId] = useState('')
-
+export function ParticipantRequests({ groupJid }: { groupJid: string }) {
   const load = useActionMutation(listParticipantRequests, {
     successMessage: 'Loaded requests',
   })
@@ -26,18 +22,18 @@ export function ParticipantRequests() {
   const decide = useActionMutation(
     ({ action, jid }: { action: 'approve' | 'reject'; jid: string }) =>
       (action === 'approve' ? approveParticipantRequests : rejectParticipantRequests)({
-        group_id: groupId,
+        group_id: groupJid,
         participants: [jid],
       }),
     {
       successMessage: 'Request handled',
-      onSuccess: () => load.mutate({ group_id: groupId }),
+      onSuccess: () => load.mutate({ group_id: groupJid }),
     },
   )
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
-    load.mutate({ group_id: groupId })
+    load.mutate({ group_id: groupJid })
   }
 
   const requests = load.data
@@ -46,16 +42,6 @@ export function ParticipantRequests() {
   return (
     <div className="flex flex-col gap-4">
       <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="requests-group-id">Group ID</Label>
-          <Input
-            id="requests-group-id"
-            placeholder="120363xxxxxxxxxxxx@g.us"
-            value={groupId}
-            onChange={(event) => setGroupId(event.target.value)}
-            required
-          />
-        </div>
         <Button type="submit" disabled={load.isPending} className="self-start">
           {load.isPending && <Loader2 className="size-4 animate-spin" />}
           Load requests
@@ -63,7 +49,7 @@ export function ParticipantRequests() {
       </form>
 
       {requests && requests.length === 0 && (
-        <p className="text-sm text-muted-foreground">No pending requests.</p>
+        <p className="text-muted-foreground text-sm">No pending requests.</p>
       )}
 
       {requests && requests.length > 0 && (
@@ -77,7 +63,7 @@ export function ParticipantRequests() {
                 <p className="truncate text-sm font-medium">
                   {request.display_name || request.phone_number || shortId(request.jid)}
                 </p>
-                <p className="truncate font-mono text-xs text-muted-foreground">
+                <p className="text-muted-foreground truncate font-mono text-xs">
                   {shortId(request.jid)} · {formatDate(request.requested_at)}
                 </p>
               </div>

@@ -48,7 +48,11 @@ export function ChatControls({ chat }: { chat: ChatInfo }) {
           <Pin className="size-4" /> Unpin
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() => run(chat.archived ? 'Chat unarchived' : 'Chat archived', () => archiveChat(chat.jid, !chat.archived))}
+          onClick={() =>
+            run(chat.archived ? 'Chat unarchived' : 'Chat archived', () =>
+              archiveChat(chat.jid, !chat.archived),
+            )
+          }
         >
           <Archive className="size-4" /> {chat.archived ? 'Unarchive' : 'Archive'}
         </DropdownMenuItem>
@@ -60,7 +64,9 @@ export function ChatControls({ chat }: { chat: ChatInfo }) {
           <DropdownMenuItem
             key={option.seconds}
             onClick={() =>
-              run(`Disappearing set: ${option.label}`, () => setDisappearing(chat.jid, option.seconds))
+              run(`Disappearing set: ${option.label}`, () =>
+                setDisappearing(chat.jid, option.seconds),
+              )
             }
           >
             {option.label}

@@ -25,7 +25,12 @@ export function ChatList({
   const query = useQuery({
     queryKey: ['chats', { search, hasMedia, offset }],
     queryFn: () =>
-      listChats({ search: search || undefined, has_media: hasMedia || undefined, limit: PAGE_SIZE, offset }),
+      listChats({
+        search: search || undefined,
+        has_media: hasMedia || undefined,
+        limit: PAGE_SIZE,
+        offset,
+      }),
     placeholderData: keepPreviousData,
   })
 
@@ -36,7 +41,7 @@ export function ChatList({
     <div className="flex h-full flex-col gap-3">
       <div className="flex flex-col gap-2">
         <div className="relative">
-          <Search className="absolute top-2.5 left-2 size-4 text-muted-foreground" />
+          <Search className="text-muted-foreground absolute top-2.5 left-2 size-4" />
           <Input
             className="pl-8"
             placeholder="Search chats"
@@ -47,7 +52,7 @@ export function ChatList({
             }}
           />
         </div>
-        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+        <label className="text-muted-foreground flex items-center gap-2 text-sm">
           <Switch
             checked={hasMedia}
             onCheckedChange={(value) => {
@@ -62,10 +67,10 @@ export function ChatList({
       <ScrollArea className="min-h-0 flex-1 rounded-md border">
         {query.isLoading ? (
           <div className="flex justify-center p-6">
-            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            <Loader2 className="text-muted-foreground size-5 animate-spin" />
           </div>
         ) : chats.length === 0 ? (
-          <p className="p-6 text-center text-sm text-muted-foreground">No chats found</p>
+          <p className="text-muted-foreground p-6 text-center text-sm">No chats found</p>
         ) : (
           <ul className="divide-y">
             {chats.map((chat) => (
@@ -74,15 +79,22 @@ export function ChatList({
                   type="button"
                   onClick={() => onSelect(chat)}
                   className={cn(
-                    'flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left transition-colors hover:bg-muted/50',
-                    selectedJid === chat.jid && 'bg-muted',
+                    'hover:bg-muted/50 flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors',
+                    selectedJid === chat.jid && 'bg-accent/60',
                   )}
                 >
-                  <span className="w-full truncate text-sm font-medium">
-                    {chat.name || chat.jid}
+                  <span className="bg-accent font-heading text-accent-foreground flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold">
+                    {(chat.name || chat.jid).slice(0, 1).toUpperCase()}
                   </span>
-                  <span className="w-full truncate text-xs text-muted-foreground">
-                    {isZeroTime(chat.last_message_time) ? chat.jid : formatDate(chat.last_message_time)}
+                  <span className="flex min-w-0 flex-col">
+                    <span className="w-full truncate text-sm font-medium">
+                      {chat.name || chat.jid}
+                    </span>
+                    <span className="text-muted-foreground w-full truncate text-xs">
+                      {isZeroTime(chat.last_message_time)
+                        ? chat.jid
+                        : formatDate(chat.last_message_time)}
+                    </span>
                   </span>
                 </button>
               </li>
@@ -91,7 +103,7 @@ export function ChatList({
         )}
       </ScrollArea>
 
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
+      <div className="text-muted-foreground flex items-center justify-between text-xs">
         <span>{total} chats</span>
         <div className="flex gap-1">
           <Button

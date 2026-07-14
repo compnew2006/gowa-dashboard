@@ -121,7 +121,7 @@ export function LoginQrDialog({
         </DialogHeader>
         <div className="flex flex-col items-center gap-3">
           {error ? (
-            <p className="py-8 text-center text-sm text-destructive">{error}</p>
+            <p className="text-destructive py-8 text-center text-sm">{error}</p>
           ) : qrSrc ? (
             <>
               <img
@@ -129,13 +129,13 @@ export function LoginQrDialog({
                 alt="WhatsApp pairing QR code"
                 className="size-64 rounded-md bg-white p-2"
               />
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 Refreshes in {secondsLeft}s — waiting for scan…
               </p>
             </>
           ) : (
             <div className="flex size-64 items-center justify-center">
-              <Loader2 className="size-6 animate-spin text-muted-foreground" />
+              <Loader2 className="text-muted-foreground size-6 animate-spin" />
             </div>
           )}
         </div>

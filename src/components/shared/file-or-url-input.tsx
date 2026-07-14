@@ -26,9 +26,7 @@ export function FileOrUrlInput({
           accept={accept}
           onChange={(event) => onChange({ ...value, file: event.target.files?.[0] })}
         />
-        {value.file && (
-          <p className="text-xs text-muted-foreground">{value.file.name}</p>
-        )}
+        {value.file && <p className="text-muted-foreground text-xs">{value.file.name}</p>}
       </div>
       <div className="flex flex-col gap-2">
         <Label>…or {label.toLowerCase()} URL</Label>

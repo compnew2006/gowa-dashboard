@@ -81,7 +81,7 @@ export function DeviceWebhookDialog({
         </DialogHeader>
         {config.isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            <Loader2 className="text-muted-foreground size-5 animate-spin" />
           </div>
         ) : (
           <form className="flex flex-col gap-4" onSubmit={onSubmit}>

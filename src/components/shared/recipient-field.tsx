@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { composeJid, isStatus, recipientOptions, type RecipientType } from '@/lib/jid'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -25,6 +26,7 @@ export function RecipientField({
 }) {
   const options = recipientOptions.filter((option) => showStatus || option.value !== 'status')
   const jid = composeJid(value.phone, value.type)
+  const id = useId()
 
   return (
     <div className="flex flex-col gap-4">
@@ -48,14 +50,14 @@ export function RecipientField({
       </div>
       {!isStatus(value.type) && (
         <div className="flex flex-col gap-2">
-          <Label htmlFor="recipient-phone">Phone / Group ID</Label>
+          <Label htmlFor={id}>Phone / Group ID</Label>
           <Input
-            id="recipient-phone"
+            id={id}
             placeholder="628xxxxxxxxxx"
             value={value.phone}
             onChange={(event) => onChange({ ...value, phone: event.target.value })}
           />
-          {jid && <p className="font-mono text-xs text-muted-foreground">{jid}</p>}
+          {jid && <p className="text-muted-foreground font-mono text-xs">{jid}</p>}
         </div>
       )}
     </div>

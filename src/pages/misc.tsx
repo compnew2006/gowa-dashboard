@@ -1,4 +1,5 @@
 import { ActionCard } from '@/components/shared/action-card'
+import { PageHeader } from '@/components/shared/page-header'
 import { CallRejectForm } from '@/features/call/call-reject-form'
 import { NewsletterList } from '@/features/newsletter/newsletter-list'
 import { DeviceGuard, useSelectedDevice } from '@/hooks/use-device-guard'
@@ -7,16 +8,16 @@ export default function MiscPage() {
   const device = useSelectedDevice()
 
   return (
-    <div className="flex max-w-2xl flex-col gap-4">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Misc</h1>
-        <p className="text-sm text-muted-foreground">Newsletters and call handling.</p>
-      </div>
+    <div className="flex flex-col gap-4">
+      <PageHeader
+        title="Channels & Calls"
+        description="Newsletters this device follows and call handling."
+      />
 
       {!device ? (
         <DeviceGuard />
       ) : (
-        <>
+        <div className="grid items-start gap-4 lg:grid-cols-2">
           <ActionCard title="Newsletters" description="Channels this device follows.">
             <NewsletterList />
           </ActionCard>
@@ -26,7 +27,7 @@ export default function MiscPage() {
           >
             <CallRejectForm />
           </ActionCard>
-        </>
+        </div>
       )}
     </div>
   )

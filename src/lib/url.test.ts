@@ -53,7 +53,9 @@ describe('toWebSocketUrl', () => {
   })
 
   it('omits empty params and uses ws for http', () => {
-    const url = new URL(toWebSocketUrl('http://localhost:3000', { device_id: '', authorization: '' }))
+    const url = new URL(
+      toWebSocketUrl('http://localhost:3000', { device_id: '', authorization: '' }),
+    )
     expect(url.protocol).toBe('ws:')
     expect(url.pathname).toBe('/ws')
     expect([...url.searchParams.keys()]).toHaveLength(0)

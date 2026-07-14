@@ -10,7 +10,9 @@ function send(path: string, body: object): Promise<SendResult> {
 }
 
 /** Build multipart form data, skipping empty/undefined values. */
-function formData(fields: Record<string, string | number | boolean | File | undefined | null>): FormData {
+function formData(
+  fields: Record<string, string | number | boolean | File | undefined | null>,
+): FormData {
   const data = new FormData()
   for (const [key, value] of Object.entries(fields)) {
     if (value === undefined || value === null || value === '') continue
@@ -102,7 +104,12 @@ export function sendVideo(
 export function sendSticker(p: MediaPayload): Promise<SendResult> {
   return sendForm(
     '/send/sticker',
-    formData({ phone: p.phone, sticker: p.file, sticker_url: p.fileUrl, is_forwarded: p.is_forwarded }),
+    formData({
+      phone: p.phone,
+      sticker: p.file,
+      sticker_url: p.fileUrl,
+      is_forwarded: p.is_forwarded,
+    }),
   )
 }
 
@@ -157,10 +164,7 @@ export function sendPresence(payload: { type: string }): Promise<SendResult> {
   return send('/send/presence', payload)
 }
 
-export function sendChatPresence(payload: {
-  phone: string
-  action: string
-}): Promise<SendResult> {
+export function sendChatPresence(payload: { phone: string; action: string }): Promise<SendResult> {
   return send('/send/chat-presence', payload)
 }
 

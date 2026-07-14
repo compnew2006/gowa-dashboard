@@ -77,17 +77,17 @@ export function DeviceCard({
   })
 
   return (
-    <Card className={cn('gap-4', selected && 'border-primary/50 ring-1 ring-primary/30')}>
+    <Card className={cn('gap-4', selected && 'border-primary/50 ring-primary/30 ring-1')}>
       <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
         <div className="min-w-0">
           <p className="truncate font-medium">{device.display_name || device.id}</p>
-          <p className="truncate text-xs text-muted-foreground">
+          <p className="text-muted-foreground truncate text-xs">
             {device.jid || device.phone_number || 'not paired yet'}
           </p>
         </div>
         <StateBadge state={device.state} />
       </CardHeader>
-      <CardContent className="text-xs text-muted-foreground">
+      <CardContent className="text-muted-foreground text-xs">
         <p className="truncate">ID: {device.id}</p>
         <p>Created {formatDate(device.created_at)}</p>
       </CardContent>
@@ -153,7 +153,7 @@ export function DeviceCard({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => remove.mutate()}
-              className="bg-destructive text-white hover:bg-destructive/90"
+              className="bg-destructive hover:bg-destructive/90 text-white"
             >
               Delete
             </AlertDialogAction>

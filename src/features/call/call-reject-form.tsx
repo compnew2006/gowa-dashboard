@@ -19,7 +19,7 @@ export function CallRejectForm() {
 
   return (
     <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-      <p className="text-sm text-muted-foreground">
+      <p className="text-muted-foreground text-sm">
         Reject an incoming call using the caller JID and call ID from the call webhook event.
       </p>
       <div className="flex flex-col gap-2">

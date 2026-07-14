@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Loader2 } from 'lucide-react'
 import { sendChatPresence } from '@/api/send'
-import { RecipientField, type RecipientValue } from '@/components/shared/recipient-field'
 import { ResultPanel } from '@/components/shared/result-panel'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -13,10 +12,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useActionMutation } from '@/hooks/use-action-mutation'
-import { composeJid } from '@/lib/jid'
+import { useRecipientJid } from '@/stores/recipient'
 
 export function SendChatPresenceForm() {
-  const [recipient, setRecipient] = useState<RecipientValue>({ phone: '', type: 'user' })
+  const jid = useRecipientJid()
   const [action, setAction] = useState('start')
 
   const mutation = useActionMutation(sendChatPresence, { successMessage: 'Chat presence sent' })
@@ -24,14 +23,13 @@ export function SendChatPresenceForm() {
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
     mutation.mutate({
-      phone: composeJid(recipient.phone, recipient.type),
+      phone: jid,
       action,
     })
   }
 
   return (
     <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-      <RecipientField value={recipient} onChange={setRecipient} showStatus />
       <div className="flex flex-col gap-2">
         <Label>Action</Label>
         <Select value={action} onValueChange={setAction}>
@@ -44,7 +42,7 @@ export function SendChatPresenceForm() {
           </SelectContent>
         </Select>
       </div>
-      <Button type="submit" disabled={mutation.isPending} className="self-start">
+      <Button type="submit" disabled={mutation.isPending || !jid} className="self-start">
         {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
         Send chat presence
       </Button>

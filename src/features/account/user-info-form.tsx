@@ -49,7 +49,7 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-4">
       <span className="text-muted-foreground">{label}</span>
-      <span className="break-all text-right font-mono">{value}</span>
+      <span className="text-right font-mono break-all">{value}</span>
     </div>
   )
 }

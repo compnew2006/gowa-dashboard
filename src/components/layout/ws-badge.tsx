@@ -3,7 +3,7 @@ import { useWsStore, type WsStatus } from '@/lib/ws'
 import { cn } from '@/lib/utils'
 
 const dotStyles: Record<WsStatus, string> = {
-  connected: 'bg-emerald-500',
+  connected: 'bg-live live-dot',
   connecting: 'bg-amber-500 animate-pulse',
   disconnected: 'bg-muted-foreground/40',
 }

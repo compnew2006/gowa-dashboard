@@ -13,7 +13,7 @@ export function PrivacyView() {
   })
 
   if (isLoading) return <Skeleton className="h-32" />
-  if (error) return <p className="text-sm text-destructive">{toApiError(error).message}</p>
+  if (error) return <p className="text-destructive text-sm">{toApiError(error).message}</p>
   if (!data) return null
 
   return (

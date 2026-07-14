@@ -1,16 +1,15 @@
 import { useState, type FormEvent } from 'react'
 import { Loader2 } from 'lucide-react'
 import { sendLocation } from '@/api/send'
-import { RecipientField, type RecipientValue } from '@/components/shared/recipient-field'
 import { ResultPanel } from '@/components/shared/result-panel'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useActionMutation } from '@/hooks/use-action-mutation'
-import { composeJid } from '@/lib/jid'
+import { useRecipientJid } from '@/stores/recipient'
 
 export function SendLocationForm() {
-  const [recipient, setRecipient] = useState<RecipientValue>({ phone: '', type: 'user' })
+  const jid = useRecipientJid()
   const [latitude, setLatitude] = useState('')
   const [longitude, setLongitude] = useState('')
 
@@ -19,7 +18,7 @@ export function SendLocationForm() {
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
     mutation.mutate({
-      phone: composeJid(recipient.phone, recipient.type),
+      phone: jid,
       latitude,
       longitude,
     })
@@ -27,7 +26,6 @@ export function SendLocationForm() {
 
   return (
     <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-      <RecipientField value={recipient} onChange={setRecipient} showStatus />
       <div className="flex flex-col gap-2">
         <Label htmlFor="location-latitude">Latitude</Label>
         <Input
@@ -48,7 +46,7 @@ export function SendLocationForm() {
           required
         />
       </div>
-      <Button type="submit" disabled={mutation.isPending} className="self-start">
+      <Button type="submit" disabled={mutation.isPending || !jid} className="self-start">
         {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
         Send location
       </Button>

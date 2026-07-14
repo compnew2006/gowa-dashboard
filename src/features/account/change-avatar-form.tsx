@@ -19,7 +19,7 @@ export function ChangeAvatarForm() {
 
   return (
     <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-      <p className="text-sm text-muted-foreground">
+      <p className="text-muted-foreground text-sm">
         Upload a square image (1:1) at least 400×400 to avoid cropping.
       </p>
       <div className="flex flex-col gap-2">

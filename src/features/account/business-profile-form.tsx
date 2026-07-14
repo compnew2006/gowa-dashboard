@@ -19,7 +19,7 @@ export function BusinessProfileForm() {
 
   return (
     <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-      <p className="text-sm text-muted-foreground">
+      <p className="text-muted-foreground text-sm">
         Works only with WhatsApp Business accounts that have a public profile.
       </p>
       <RecipientField value={recipient} onChange={setRecipient} />
@@ -71,7 +71,7 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-4">
       <span className="text-muted-foreground">{label}</span>
-      <span className="break-all text-right font-mono">{value}</span>
+      <span className="text-right font-mono break-all">{value}</span>
     </div>
   )
 }

@@ -1,16 +1,15 @@
 import { useState, type FormEvent } from 'react'
 import { Loader2, Plus, X } from 'lucide-react'
 import { sendPoll } from '@/api/send'
-import { RecipientField, type RecipientValue } from '@/components/shared/recipient-field'
 import { ResultPanel } from '@/components/shared/result-panel'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useActionMutation } from '@/hooks/use-action-mutation'
-import { composeJid } from '@/lib/jid'
+import { useRecipientJid } from '@/stores/recipient'
 
 export function SendPollForm() {
-  const [recipient, setRecipient] = useState<RecipientValue>({ phone: '', type: 'user' })
+  const jid = useRecipientJid()
   const [question, setQuestion] = useState('')
   const [options, setOptions] = useState<string[]>(['', ''])
   const [maxAnswer, setMaxAnswer] = useState(1)
@@ -20,13 +19,12 @@ export function SendPollForm() {
   const setOption = (index: number, value: string) =>
     setOptions((prev) => prev.map((option, i) => (i === index ? value : option)))
   const addOption = () => setOptions((prev) => [...prev, ''])
-  const removeOption = (index: number) =>
-    setOptions((prev) => prev.filter((_, i) => i !== index))
+  const removeOption = (index: number) => setOptions((prev) => prev.filter((_, i) => i !== index))
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
     mutation.mutate({
-      phone: composeJid(recipient.phone, recipient.type),
+      phone: jid,
       question,
       options: options.map((option) => option.trim()).filter(Boolean),
       max_answer: maxAnswer,
@@ -35,7 +33,6 @@ export function SendPollForm() {
 
   return (
     <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-      <RecipientField value={recipient} onChange={setRecipient} showStatus />
       <div className="flex flex-col gap-2">
         <Label htmlFor="poll-question">Question</Label>
         <Input
@@ -86,7 +83,7 @@ export function SendPollForm() {
           onChange={(event) => setMaxAnswer(Number(event.target.value))}
         />
       </div>
-      <Button type="submit" disabled={mutation.isPending} className="self-start">
+      <Button type="submit" disabled={mutation.isPending || !jid} className="self-start">
         {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
         Send poll
       </Button>

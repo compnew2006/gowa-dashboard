@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { LogOut, RefreshCw, Users } from 'lucide-react'
+import { ChevronRight, LogOut, RefreshCw, Search, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { leaveGroup, listMyGroups, type MyGroup } from '@/api/group'
-import { ParticipantsDialog } from '@/features/group/participants-dialog'
+import { EmptyState } from '@/components/shared/empty-state'
+import { IdText } from '@/components/shared/id-text'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,7 +16,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useSelectedDevice } from '@/hooks/use-device-guard'
 import { toApiError } from '@/lib/api-error'
@@ -26,11 +28,11 @@ function shortId(jid: string): string {
   return jid.split('@')[0]
 }
 
-export function GroupList() {
+export function GroupDirectory({ onSelect }: { onSelect: (group: MyGroup) => void }) {
   const deviceId = useSelectedDevice()
   const queryClient = useQueryClient()
+  const [search, setSearch] = useState('')
   const [leaveTarget, setLeaveTarget] = useState<MyGroup | null>(null)
-  const [participantsTarget, setParticipantsTarget] = useState<MyGroup | null>(null)
 
   const {
     data: groups,
@@ -51,15 +53,29 @@ export function GroupList() {
       setLeaveTarget(null)
       void queryClient.invalidateQueries({ queryKey: ['groups'] })
     },
-    onError: (error) => toast.error(toApiError(error).message),
+    onError: (mutationError) => toast.error(toApiError(mutationError).message),
   })
+
+  const filtered = useMemo(() => {
+    if (!groups) return []
+    const term = search.trim().toLowerCase()
+    if (!term) return groups
+    return groups.filter(
+      (group) => group.Name.toLowerCase().includes(term) || group.JID.toLowerCase().includes(term),
+    )
+  }, [groups, search])
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Groups</h1>
-          <p className="text-sm text-muted-foreground">Groups this device belongs to</p>
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="text-muted-foreground absolute top-2.5 left-2.5 size-4" />
+          <Input
+            className="pl-8"
+            placeholder="Search groups by name or ID"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
         </div>
         <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
           <RefreshCw className={isFetching ? 'size-4 animate-spin' : 'size-4'} />
@@ -69,70 +85,76 @@ export function GroupList() {
 
       {error && (
         <Card className="border-destructive/50">
-          <CardContent className="py-4 text-sm text-destructive">
+          <CardContent className="text-destructive py-4 text-sm">
             Failed to load groups: {toApiError(error).message}
           </CardContent>
         </Card>
       )}
 
       {isLoading && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <Skeleton className="h-40" />
-          <Skeleton className="h-40" />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
         </div>
       )}
 
       {groups && groups.length === 0 && (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
-            <Users className="size-8 text-muted-foreground" />
-            <p className="font-medium">No groups yet</p>
-            <p className="text-sm text-muted-foreground">
-              Create a group or join one with an invite link.
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={Users}
+          title="No groups yet"
+          hint="Create a group or join one with an invite link."
+        />
       )}
 
-      {groups && groups.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {groups.map((group) => (
-            <Card key={group.JID} className="gap-4">
-              <CardHeader>
-                <p className="truncate font-medium">{group.Name || shortId(group.JID)}</p>
-                <p className="truncate font-mono text-xs text-muted-foreground">
-                  {shortId(group.JID)}
-                </p>
-              </CardHeader>
-              <CardContent className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Users className="size-4" />
-                {group.Participants?.length ?? group.ParticipantCount ?? 0} participants
-                <span className="ml-auto">{formatDate(group.GroupCreated)}</span>
-              </CardContent>
-              <CardFooter className="justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => setParticipantsTarget(group)}>
-                  <Users className="size-4" />
-                  Participants
-                </Button>
+      {groups && groups.length > 0 && filtered.length === 0 && (
+        <EmptyState icon={Search} title="No matches" hint={`Nothing matches "${search}".`} />
+      )}
+
+      {filtered.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {filtered.map((group) => (
+            <Card key={group.JID} className="card-lift cursor-pointer gap-0 py-0">
+              <CardContent
+                className="flex items-center gap-3 p-4"
+                onClick={() => onSelect(group)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    onSelect(group)
+                  }
+                }}
+              >
+                <div className="bg-accent font-heading text-accent-foreground flex size-10 shrink-0 items-center justify-center rounded-full font-semibold">
+                  {(group.Name || '#').slice(0, 1).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{group.Name || shortId(group.JID)}</p>
+                  <IdText value={shortId(group.JID)} />
+                  <p className="text-muted-foreground text-xs">
+                    {group.Participants?.length ?? group.ParticipantCount ?? 0} participants ·{' '}
+                    {formatDate(group.GroupCreated)}
+                  </p>
+                </div>
                 <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-destructive hover:text-destructive"
-                  onClick={() => setLeaveTarget(group)}
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Leave ${group.Name || 'group'}`}
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setLeaveTarget(group)
+                  }}
                 >
                   <LogOut className="size-4" />
-                  Leave
                 </Button>
-              </CardFooter>
+                <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+              </CardContent>
             </Card>
           ))}
         </div>
       )}
-
-      <ParticipantsDialog
-        group={participantsTarget}
-        onOpenChange={(open) => !open && setParticipantsTarget(null)}
-      />
 
       <AlertDialog open={!!leaveTarget} onOpenChange={(open) => !open && setLeaveTarget(null)}>
         <AlertDialogContent>
@@ -146,7 +168,7 @@ export function GroupList() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => leaveTarget && leave.mutate({ group_id: leaveTarget.JID })}
-              className="bg-destructive text-white hover:bg-destructive/90"
+              className="bg-destructive hover:bg-destructive/90 text-white"
             >
               Leave
             </AlertDialogAction>

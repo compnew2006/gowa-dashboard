@@ -1,39 +1,25 @@
-import { useState, type FormEvent } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { getGroupInfo } from '@/api/group'
 import { ResultPanel } from '@/components/shared/result-panel'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { useActionMutation } from '@/hooks/use-action-mutation'
+import { toApiError } from '@/lib/api-error'
 
-export function InfoForm() {
-  const [groupId, setGroupId] = useState('')
+export function GroupOverview({ groupJid }: { groupJid: string }) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['group-info', groupJid],
+    queryFn: () => getGroupInfo({ group_id: groupJid }),
+    enabled: !!groupJid,
+  })
 
-  const mutation = useActionMutation(getGroupInfo, { successMessage: 'Loaded group info' })
-
-  const onSubmit = (event: FormEvent) => {
-    event.preventDefault()
-    mutation.mutate({ group_id: groupId })
-  }
-
-  return (
-    <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="info-group-id">Group ID</Label>
-        <Input
-          id="info-group-id"
-          placeholder="120363xxxxxxxxxxxx@g.us"
-          value={groupId}
-          onChange={(event) => setGroupId(event.target.value)}
-          required
-        />
+  if (isLoading) {
+    return (
+      <div className="flex justify-center p-6">
+        <Loader2 className="text-muted-foreground size-5 animate-spin" />
       </div>
-      <Button type="submit" disabled={mutation.isPending} className="self-start">
-        {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
-        Get info
-      </Button>
-      <ResultPanel result={mutation.data} />
-    </form>
-  )
+    )
+  }
+  if (error) {
+    return <p className="text-destructive text-sm">{toApiError(error).message}</p>
+  }
+  return <ResultPanel result={data} />
 }

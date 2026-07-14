@@ -3,34 +3,22 @@ import { Loader2 } from 'lucide-react'
 import { setGroupTopic } from '@/api/group'
 import { ResultPanel } from '@/components/shared/result-panel'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useActionMutation } from '@/hooks/use-action-mutation'
 
-export function SetTopicForm() {
-  const [groupId, setGroupId] = useState('')
+export function SetTopicForm({ groupJid }: { groupJid: string }) {
   const [topic, setTopic] = useState('')
 
   const mutation = useActionMutation(setGroupTopic, { successMessage: 'Group topic updated' })
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
-    mutation.mutate({ group_id: groupId, topic })
+    mutation.mutate({ group_id: groupJid, topic })
   }
 
   return (
     <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="set-topic-group-id">Group ID</Label>
-        <Input
-          id="set-topic-group-id"
-          placeholder="120363xxxxxxxxxxxx@g.us"
-          value={groupId}
-          onChange={(event) => setGroupId(event.target.value)}
-          required
-        />
-      </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="set-topic-value">Topic (leave empty to clear)</Label>
         <Textarea
