@@ -1,16 +1,25 @@
 import { useState, type FormEvent } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { changeAvatar } from '@/api/user'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useActionMutation } from '@/hooks/use-action-mutation'
+import { useSelectedDevice } from '@/hooks/use-device-guard'
 
 export function ChangeAvatarForm() {
   const [file, setFile] = useState<File>()
   const [preview, setPreview] = useState<string>()
+  const queryClient = useQueryClient()
+  const deviceId = useSelectedDevice()
 
-  const mutation = useActionMutation(changeAvatar, { successMessage: 'Avatar updated' })
+  const mutation = useActionMutation(changeAvatar, {
+    successMessage: 'Avatar updated',
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['device-avatar', deviceId] })
+    },
+  })
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()

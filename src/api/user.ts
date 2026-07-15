@@ -86,8 +86,13 @@ export function getUserInfo(phone: string): Promise<UserInfoResponse> {
   return results<UserInfoResponse>(http.get('/user/info', { params: { phone } }))
 }
 
-export function getUserAvatar(params: AvatarParams): Promise<AvatarResponse> {
-  return results<AvatarResponse>(http.get('/user/avatar', { params }))
+export function getUserAvatar(params: AvatarParams, deviceId?: string): Promise<AvatarResponse> {
+  return results<AvatarResponse>(
+    http.get('/user/avatar', {
+      params,
+      headers: deviceId ? { 'X-Device-Id': encodeURIComponent(deviceId) } : undefined,
+    }),
+  )
 }
 
 export async function changeAvatar(file: File): Promise<void> {

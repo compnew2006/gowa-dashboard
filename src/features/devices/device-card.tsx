@@ -1,6 +1,15 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { KeyRound, MoreVertical, QrCode, RefreshCw, Trash2, Unplug, Webhook } from 'lucide-react'
+import {
+  CircleUserRound,
+  KeyRound,
+  MoreVertical,
+  QrCode,
+  RefreshCw,
+  Trash2,
+  Unplug,
+  Webhook,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { logoutDevice, reconnectDevice, removeDevice } from '@/api/devices'
 import {
@@ -13,6 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import {
@@ -24,6 +34,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { StateBadge } from '@/features/devices/state-badge'
 import { DeviceWebhookDialog } from '@/features/devices/webhook-dialog'
+import { useDeviceAvatar } from '@/hooks/use-device-avatar'
 import { toApiError } from '@/lib/api-error'
 import { formatDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -45,6 +56,7 @@ export function DeviceCard({
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [webhookOpen, setWebhookOpen] = useState(false)
   const selected = selectedDeviceId === device.id
+  const avatar = useDeviceAvatar(device)
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['devices'] })
 
@@ -79,11 +91,21 @@ export function DeviceCard({
   return (
     <Card className={cn('gap-4', selected && 'border-primary/50 ring-primary/30 ring-1')}>
       <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
-        <div className="min-w-0">
-          <p className="truncate font-medium">{device.display_name || device.id}</p>
-          <p className="text-muted-foreground truncate text-xs">
-            {device.jid || device.phone_number || 'not paired yet'}
-          </p>
+        <div className="flex min-w-0 items-center gap-3">
+          <Avatar size="lg">
+            {avatar.data?.url && (
+              <AvatarImage src={avatar.data.url} alt={device.display_name || device.id} />
+            )}
+            <AvatarFallback>
+              <CircleUserRound className="text-muted-foreground size-5" />
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <p className="truncate font-medium">{device.display_name || device.id}</p>
+            <p className="text-muted-foreground truncate text-xs">
+              {device.jid || device.phone_number || 'not paired yet'}
+            </p>
+          </div>
         </div>
         <StateBadge state={device.state} />
       </CardHeader>

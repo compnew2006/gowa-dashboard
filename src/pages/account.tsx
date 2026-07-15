@@ -27,6 +27,7 @@ import { BusinessProfileForm } from '@/features/account/business-profile-form'
 import { ChangeAvatarForm } from '@/features/account/change-avatar-form'
 import { ContactsView } from '@/features/account/contacts-view'
 import { PrivacyView } from '@/features/account/privacy-view'
+import { MyProfileCard } from '@/features/account/profile-card'
 import { PushnameForm } from '@/features/account/pushname-form'
 import { UserCheckForm } from '@/features/account/user-check-form'
 import { UserInfoForm } from '@/features/account/user-info-form'
@@ -154,6 +155,7 @@ export default function AccountPage() {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="profile" className="flex max-w-2xl flex-col gap-4">
+            <MyProfileCard />
             <ActionCard title="Change avatar" description="Update your own profile picture.">
               <ChangeAvatarForm />
             </ActionCard>

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { changePushName } from '@/api/user'
 import { Button } from '@/components/ui/button'
@@ -8,8 +9,14 @@ import { useActionMutation } from '@/hooks/use-action-mutation'
 
 export function PushnameForm() {
   const [pushName, setPushName] = useState('')
+  const queryClient = useQueryClient()
 
-  const mutation = useActionMutation(changePushName, { successMessage: 'Push name updated' })
+  const mutation = useActionMutation(changePushName, {
+    successMessage: 'Push name updated',
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['devices'] })
+    },
+  })
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
