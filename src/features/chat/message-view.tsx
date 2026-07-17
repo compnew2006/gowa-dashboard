@@ -1,13 +1,21 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2, Send } from 'lucide-react'
+import { Loader2, Reply, Send, SmilePlus, X } from 'lucide-react'
 import { getChatMessages, type ChatInfo, type MessageInfo } from '@/api/chat'
+import { reactRequest } from '@/api/message'
+import { exec } from '@/api/request'
 import { sendText } from '@/api/send'
 import { MessageMedia } from '@/features/chat/message-media'
 import { ChatControls } from '@/features/chat/chat-controls'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
 import { useActionMutation } from '@/hooks/use-action-mutation'
 import { formatDate } from '@/lib/format'
@@ -15,14 +23,55 @@ import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 30
 
+// Fixed shortlist offered in the per-bubble react picker. The free-text Input
+// in the dropdown covers anything outside this list, and "Remove" sends an
+// empty emoji (the existing ReactForm placeholder documents that empty removes
+// the reaction).
+const REACTION_SHORTLIST = ['👍', '❤️', '😂', '😮', '😢', '🙏']
+
 function dayKey(timestamp: string): string {
   return new Date(timestamp).toDateString()
 }
 
-function MessageBubble({ message }: { message: MessageInfo }) {
+function MessageBubble({
+  message,
+  chatJid,
+  onReply,
+}: {
+  message: MessageInfo
+  chatJid: string
+  onReply: (message: MessageInfo) => void
+}) {
+  const queryClient = useQueryClient()
   const hasMedia = message.media_type && message.media_type !== ''
+  const [customEmoji, setCustomEmoji] = useState('')
+
+  // Reuse the proven reactRequest + exec + useActionMutation trio (the same
+  // pattern MessageActionForm uses in message-forms.tsx). `phone` stays
+  // chat.jid for the chat viewer (NOT the global recipient store), and an
+  // empty emoji is a remove per the existing ReactForm contract.
+  const reactMutation = useActionMutation(
+    (vars: { messageId: string; emoji: string }) =>
+      exec(reactRequest(vars.messageId, { phone: chatJid, emoji: vars.emoji })),
+    {
+      successMessage: 'Reaction sent',
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: ['chat-messages', chatJid] })
+      },
+    },
+  )
+
+  const sendReaction = (emoji: string) => {
+    reactMutation.mutate({ messageId: message.id, emoji })
+  }
+
   return (
-    <div className={cn('flex', message.is_from_me ? 'justify-end' : 'justify-start')}>
+    <div
+      className={cn(
+        'group flex items-end gap-1',
+        message.is_from_me ? 'justify-end' : 'justify-start',
+      )}
+    >
       <div
         className={cn(
           'max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-xs',
@@ -37,9 +86,77 @@ function MessageBubble({ message }: { message: MessageInfo }) {
         {message.reactions && message.reactions.length > 0 && (
           <p className="mt-1 text-xs">{message.reactions.map((r) => r.emoji).join(' ')}</p>
         )}
-        <p className="text-muted-foreground mt-1 text-right text-[10px]">
+        <p className="text-muted-foreground mt-1 text-right text-xs">
           {formatDate(message.timestamp)}
         </p>
+      </div>
+      <div
+        className={cn(
+          'flex items-end gap-0.5 opacity-0 motion-safe:transition-opacity group-hover:opacity-100 focus-within:opacity-100',
+          message.is_from_me ? 'order-first' : 'order-last',
+        )}
+      >
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground size-6 focus-visible:opacity-100"
+              aria-label="React to message"
+              disabled={reactMutation.isPending}
+            >
+              <SmilePlus className="size-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align={message.is_from_me ? 'end' : 'start'}>
+            <div className="flex flex-wrap gap-1 p-1">
+              {REACTION_SHORTLIST.map((emoji) => (
+                <DropdownMenuItem
+                  key={emoji}
+                  className="justify-center text-base"
+                  onSelect={() => sendReaction(emoji)}
+                >
+                  {emoji}
+                </DropdownMenuItem>
+              ))}
+            </div>
+            <DropdownMenuSeparator />
+            <form
+              className="flex items-center gap-1 p-1"
+              onSubmit={(event) => {
+                event.preventDefault()
+                const trimmed = customEmoji.trim()
+                if (trimmed) {
+                  sendReaction(trimmed)
+                  setCustomEmoji('')
+                }
+              }}
+            >
+              <Input
+                value={customEmoji}
+                className="h-8 text-sm"
+                placeholder="Emoji"
+                onChange={(event) => setCustomEmoji(event.target.value)}
+              />
+              <Button type="submit" size="sm" disabled={!customEmoji.trim()}>
+                Send
+              </Button>
+            </form>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" onSelect={() => sendReaction('')}>
+              Remove
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground size-6 focus-visible:opacity-100"
+          aria-label="Reply to message"
+          onClick={() => onReply(message)}
+        >
+          <Reply className="size-3.5" />
+        </Button>
       </div>
     </div>
   )
@@ -47,10 +164,12 @@ function MessageBubble({ message }: { message: MessageInfo }) {
 
 export function MessageView({ chat }: { chat: ChatInfo }) {
   const queryClient = useQueryClient()
+  const scrollRef = useRef<HTMLDivElement | null>(null)
   const [search, setSearch] = useState('')
   const [mediaOnly, setMediaOnly] = useState(false)
   const [offset, setOffset] = useState(0)
   const [draft, setDraft] = useState('')
+  const [replyTarget, setReplyTarget] = useState<MessageInfo | null>(null)
 
   const query = useQuery({
     queryKey: ['chat-messages', chat.jid, { search, mediaOnly, offset }],
@@ -65,14 +184,29 @@ export function MessageView({ chat }: { chat: ChatInfo }) {
   })
 
   const messages = query.data?.data ?? []
+  // Reverse a COPY: `messages` is a reference into the TanStack Query cache,
+  // so we never mutate it. The API returns newest-first within each page;
+  // reversing gives the chronological top-to-bottom order every chat client uses.
+  const ordered = [...messages].reverse()
   const total = query.data?.pagination.total ?? 0
 
+  // Auto-scroll the pane to the newest message on chat switch, initial load,
+  // and list growth (e.g. after a send invalidates and refetches). Instant jump
+  // (no smooth behaviour); `draft` is intentionally absent from the deps so the
+  // scroll does not fire on every keystroke.
+  useEffect(() => {
+    if (query.isLoading) return
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+  }, [chat.jid, messages.length, query.isLoading])
+
   const sendMutation = useActionMutation(
-    (message: string) => sendText({ phone: chat.jid, message }),
+    (message: string) =>
+      sendText({ phone: chat.jid, message, reply_message_id: replyTarget?.id || undefined }),
     {
       successMessage: 'Message sent',
       onSuccess: () => {
         setDraft('')
+        setReplyTarget(null)
         void queryClient.invalidateQueries({ queryKey: ['chat-messages', chat.jid] })
       },
     },
@@ -115,7 +249,10 @@ export function MessageView({ chat }: { chat: ChatInfo }) {
         </label>
       </div>
 
-      <ScrollArea className="bg-muted/40 min-h-0 flex-1 rounded-lg border p-3">
+      <div
+        ref={scrollRef}
+        className="bg-muted/40 min-h-0 flex-1 overflow-y-auto rounded-lg border p-3"
+      >
         {query.isLoading ? (
           <div className="flex justify-center p-6">
             <Loader2 className="text-muted-foreground size-5 animate-spin" />
@@ -131,9 +268,9 @@ export function MessageView({ chat }: { chat: ChatInfo }) {
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            {messages.map((message, index) => {
+            {ordered.map((message, index) => {
               const showDateSeparator =
-                index === 0 || dayKey(message.timestamp) !== dayKey(messages[index - 1].timestamp)
+                index === 0 || dayKey(message.timestamp) !== dayKey(ordered[index - 1].timestamp)
               return (
                 <div key={message.id}>
                   {showDateSeparator && (
@@ -147,13 +284,17 @@ export function MessageView({ chat }: { chat: ChatInfo }) {
                       </span>
                     </div>
                   )}
-                  <MessageBubble message={message} />
+                  <MessageBubble
+                    message={message}
+                    chatJid={chat.jid}
+                    onReply={setReplyTarget}
+                  />
                 </div>
               )
             })}
           </div>
         )}
-      </ScrollArea>
+      </div>
 
       <div className="text-muted-foreground flex items-center justify-between text-xs">
         <span>{total} messages</span>
@@ -176,6 +317,29 @@ export function MessageView({ chat }: { chat: ChatInfo }) {
           </Button>
         </div>
       </div>
+
+      {replyTarget && (
+        <div className="bg-muted/40 flex items-center gap-2 rounded-lg border p-2 text-sm">
+          <Reply className="text-muted-foreground size-4 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-muted-foreground truncate font-mono text-xs">
+              {replyTarget.sender_jid}
+            </p>
+            <p className="truncate">
+              {replyTarget.content || (replyTarget.media_type ? '[media]' : '')}
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground size-6 shrink-0"
+            aria-label="Cancel reply"
+            onClick={() => setReplyTarget(null)}
+          >
+            <X className="size-3.5" />
+          </Button>
+        </div>
+      )}
 
       <form className="flex gap-2" onSubmit={onSend}>
         <Input

@@ -1,0 +1,273 @@
+---
+name: gowa-ui
+description: A single-file operator's dashboard for go-whatsapp-web-multidevice — calm, precise, technical.
+colors:
+  # Steel Blue primary (logo #7caec2). Two committed values: deeper for light-mode legibility, logo-near for dark.
+  steel-blue: "oklch(0.55 0.09 225)"
+  steel-blue-bright: "oklch(0.72 0.075 225)"
+  steel-blue-ring: "oklch(0.66 0.09 225)"
+  # Neutrals, blue-tinted toward the brand hue (not warm-by-default).
+  cool-paper: "oklch(0.965 0.006 225)"
+  blue-tinted-charcoal: "oklch(0.18 0.016 235)"
+  workshop-ink: "oklch(0.24 0.02 235)"
+  console-mist: "oklch(0.93 0.008 225)"
+  graphite: "oklch(0.5 0.02 220)"
+  pale-steel: "oklch(0.9 0.012 225)"
+  # Signal hues — status only, never decoration.
+  signal-emerald: "#16a34a"
+  signal-sky: "#0284c7"
+  signal-amber: "#d97706"
+  # Live WebSocket indicator (own token, greener than emerald-status).
+  live-green: "oklch(0.72 0.17 152)"
+  live-green-bright: "oklch(0.78 0.19 152)"
+  # Destructive (shadcn default, kept).
+  destructive: "oklch(0.577 0.245 27.325)"
+  destructive-bright: "oklch(0.704 0.191 22.216)"
+  # Chat bubbles (messaging surface).
+  bubble-in: "oklch(1 0 0)"
+  bubble-out: "oklch(0.93 0.045 225)"
+typography:
+  display:
+    fontFamily: "'Bricolage Grotesque Variable', sans-serif"
+    fontWeight: 500
+    letterSpacing: "0em"
+    purpose: "H1–H3 headings only. Sets a quietly geometric, slightly humanist tone against the Figtree body."
+  body:
+    fontFamily: "'Figtree Variable', sans-serif"
+    fontSize: "0.875rem"
+    fontWeight: 400
+    lineHeight: "1.5"
+    purpose: "All UI text, labels, descriptions, table cells. The workhorse."
+  label:
+    fontFamily: "'Figtree Variable', sans-serif"
+    fontSize: "0.75rem"
+    fontWeight: 500
+    letterSpacing: "0em"
+    purpose: "Compact UI labels: nav group headers (uppercase, tracked), badge text, table headers."
+  mono:
+    fontFamily: "'JetBrains Mono Variable', ui-monospace, monospace"
+    fontSize: "0.8125rem"
+    fontWeight: 400
+    purpose: "Device IDs, JIDs, webhook secrets, event codes, push names — any identifier an operator scans."
+rounded:
+  sm: "calc(0.875rem * 0.6)"
+  md: "calc(0.875rem * 0.8)"
+  lg: "0.875rem"
+  xl: "calc(0.875rem * 1.4)"
+  pill: "9999px"
+spacing:
+  control-tight: "0.25rem"
+  control: "0.625rem"
+  card-pad: "1rem"
+  section-gap: "1.25rem"
+components:
+  button-primary:
+    backgroundColor: "{colors.steel-blue}"
+    textColor: "{colors.cool-paper}"
+    rounded: "{rounded.lg}"
+    padding: "0.625rem"
+    height: "2rem"
+  button-primary-hover:
+    backgroundColor: "oklch(0.55 0.09 225 / 80%)"
+  button-outline:
+    backgroundColor: "{colors.cool-paper}"
+    textColor: "{colors.workshop-ink}"
+    rounded: "{rounded.lg}"
+  button-ghost:
+    backgroundColor: "transparent"
+    textColor: "{colors.graphite}"
+    rounded: "{rounded.lg}"
+  button-destructive:
+    backgroundColor: "oklch(0.577 0.245 27.325 / 10%)"
+    textColor: "{colors.destructive}"
+    rounded: "{rounded.lg}"
+  input:
+    backgroundColor: "transparent"
+    textColor: "{colors.workshop-ink}"
+    rounded: "{rounded.lg}"
+    height: "2rem"
+    padding: "0.625rem"
+  card:
+    backgroundColor: "{colors.card-light}"
+    textColor: "{colors.workshop-ink}"
+    rounded: "{rounded.xl}"
+  badge-default:
+    backgroundColor: "{colors.steel-blue}"
+    textColor: "{colors.cool-paper}"
+    rounded: "{rounded.pill}"
+  nav-item:
+    backgroundColor: "transparent"
+    textColor: "{colors.graphite}"
+    rounded: "{rounded.pill}"
+  nav-item-active:
+    backgroundColor: "{colors.steel-blue}"
+    textColor: "{colors.cool-paper}"
+    rounded: "{rounded.pill}"
+---
+
+# Design System: gowa-ui
+
+## 1. Overview
+
+**Creative North Star: "The Instrument Panel"**
+
+gowa-ui is a dashboard for operators running a self-hosted gowa server. The interface should read like a well-instrumented console: the system's state — which devices are connected, whether the WebSocket is live, what just happened — is always visible and always legible, and nothing decorative competes with it. Every screen is built to be scanned first and read second.
+
+The system is **calm, precise, technical**. Calm: a single steel-blue accent carried from the gowa logo (`#7caec2`), blue-tinted neutrals, flat surfaces, and motion that only fires on state change. No gradients, no hero metrics, no decorative chrome. Precise: compact controls (`h-8` is the default, not the small size), verb+object labels, monospaced identifiers, exactly-named states. Technical: the user is an operator, and we respect that — device IDs, JIDs, event codes, and webhook secrets are shown plainly in JetBrains Mono, never hidden behind polish.
+
+This system explicitly rejects the generic SaaS dashboard template: no indigo-to-violet gradient heroes, no big-number-with-tiny-label metric strips, no identical icon-heading-text card grids, no glassmorphism, no side-stripe accent borders, no per-section uppercase eyebrow kickers, no `01 / 02 / 03` numbered scaffolding. Identity comes from the steel-blue brand and the technical content, not from a category template.
+
+**Key Characteristics:**
+- **Restrained color.** One steel-blue primary, blue-tinted neutrals, three status hues reserved for state, one live-green for the WebSocket. Nothing else carries color.
+- **Compact density.** `h-8` controls, `h-5` badges, tight gaps. This is a tool operators live in, not a marketing surface.
+- **Flat by default, lift on interaction.** Cards use a 1px ring at rest; shadow appears only on hover. Depth signals state, never decoration.
+- **Two sans + one mono.** Bricolage Grotesque for headings, Figtree for everything else, JetBrains Mono for identifiers. Three families is the ceiling; we don't reach for a fourth.
+- **Motion conveys state.** 150–250ms transitions, a staggered page entrance, a single live-dot pulse. All gated by `prefers-reduced-motion`.
+
+## 2. Colors: The Steel Blue + Signal Palette
+
+A single brand hue carries the identity; three signal hues carry state; one live hue carries the WebSocket. Everything else is blue-tinted neutral.
+
+### Primary
+- **Steel Blue** (`oklch(0.55 0.09 225)` ≈ `#277c99`, light) / **Steel Blue Bright** (`oklch(0.72 0.075 225)` ≈ `#6fafc8`, dark — matches the gowa logo `#7caec2`): the brand accent. Primary buttons, active nav items, focus rings (`--ring` at `oklch(0.66 0.09 225)`), links, default badges, chart-1. Used on ≤10% of any given screen; its rarity is the point.
+- **Steel Blue Ring** (`oklch(0.66 0.09 225)` ≈ `#4d9ebc`): focus-ring variant, slightly brighter than the primary so it reads against tinted backgrounds.
+
+### Neutral
+- **Cool Paper** (`oklch(0.965 0.006 225)` ≈ `#eff4f6`, light body background): the page surface. A near-white tinted toward the brand hue — not warm-by-default. The faint blue tint is what ties the surface to the brand without dyeing it.
+- **Blue-Tinted Charcoal** (`oklch(0.18 0.016 235)` ≈ `#0b1318`, dark body background): the dark-mode surface. Deeper and slightly cooler than the light bg, with enough blue tint to read as the same brand at night.
+- **Workshop Ink** (`oklch(0.24 0.02 235)` ≈ `#162127`, light foreground) / **Console Mist** (`oklch(0.93 0.008 225)` ≈ `#e3e9ec`, dark foreground): body text. High contrast against their backgrounds (≥10:1 light, ≥10:1 dark).
+- **Graphite** (`oklch(0.5 0.02 220)` ≈ `#57666b`, light) / `oklch(0.62 0.015 225)` ≈ `#7d888d` (dark): muted-foreground — secondary labels, descriptions, nav inactive, placeholder text. Verified ≥4.5:1 against Cool Paper and Blue-Tinted Charcoal.
+- **Pale Steel** (`oklch(0.9 0.012 225)` ≈ `#d6e0e4`, light border) / `oklch(1 0 0 / 12%)` (dark border): hairline borders, input borders, dividers. Subtle on purpose.
+- **Card White** (`oklch(1 0 0)` = `#ffffff`, light card) / `oklch(0.22 0.016 235)` ≈ `#131c21` (dark card): card and popover surfaces, one step lifted from the body bg.
+
+### Signal (status only — never decoration)
+- **Signal Emerald** (`#16a34a`, Tailwind emerald-600): device `logged_in` state. Pairs the hue with the word "Logged in" — color is never the only signal.
+- **Signal Sky** (`#0284c7`, Tailwind sky-600): device `connected` state.
+- **Signal Amber** (`#d97706`, Tailwind amber-600): device `connecting` state, plus WebSocket `connecting` (with `animate-pulse`).
+- **Live Green** (`oklch(0.72 0.17 152)` ≈ `#35c26d`, light) / **Live Green Bright** (`oklch(0.78 0.19 152)` ≈ `#33d977`, dark): the WebSocket live dot. Greener and more saturated than Signal Emerald so "live updates" reads as distinct from "device logged in". Owns the `.live-dot` pulse.
+
+### Destructive
+- **Destructive** (`oklch(0.577 0.245 27.325)` ≈ `#e7000b`, light) / `oklch(0.704 0.191 22.216)` ≈ `#ff6467` (dark): the shadcn default red, kept. Destructive buttons use a 10% tint background + full-saturation text (never a solid red button except in AlertDialog confirmations).
+
+### Named Rules
+
+**The One Voice Rule.** Steel Blue is the only brand accent. It appears on primary actions, the active nav item, focus rings, links, and default badges — and nowhere else. If a second "brand-ish" color seems needed, the answer is a neutral, not a new hue.
+
+**The Signal-Only Rule.** Signal Emerald, Signal Sky, and Signal Amber exist exclusively to encode device/WebSocket state. They never decorate cards, never tint headings, never appear in marketing-style accents. A status badge with a tinted background (`bg-emerald-500/15`) and a colored label is the only correct use.
+
+**The Tint-Toward-Brand Rule.** Neutrals are tinted toward hue 225 (steel blue), not toward warm or cool by default. The faint blue in Cool Paper and Blue-Tinted Charcoal is what makes the surface feel like gowa rather than like a generic gray dashboard. Chroma stays ≤0.02 on neutrals — enough to read as branded, not enough to read as colored.
+
+## 3. Typography
+
+**Display Font:** Bricolage Grotesque Variable (sans-serif fallback)
+**Body Font:** Figtree Variable (`sans-serif` fallback)
+**Mono Font:** JetBrains Mono Variable (`ui-monospace, monospace` fallback)
+
+**Character:** A quietly geometric display face against a workhorse humanist sans. Bricolage Grotesque gives headings a slight humanist warmth without going decorative; Figtree carries everything else with even color and open counters. The pairing reads as "a tool made by people who care," not as "a font flex." JetBrains Mono earns its place by making identifiers scannable — a device ID in mono is faster to verify than the same ID in proportional type.
+
+### Hierarchy
+- **Display** (Bricolage Grotesque, weight 500, page H1, ~`text-2xl`/`1.5rem`, `leading-snug`): page titles ("Devices", "Messaging", "Groups"). One per page, top-left.
+- **Headline** (Bricolage Grotesque, weight 500, card titles, `text-base`/`1rem`, `leading-snug`): card and dialog titles. The `font-heading` class is applied via `h1, h2, h3 { @apply font-heading }` in `index.css`.
+- **Title** (Figtree, weight 500, `text-sm`/`0.875rem`): section labels, list-item primary text, form-field group headings.
+- **Body** (Figtree, weight 400, `text-sm`/`0.875rem`, `leading-1.5`): descriptions, table cells, dialog body copy, form helper text. Prose line length is naturally capped by the `max-w-5xl` page container; long-form prose would target 65–75ch but rarely appears in this product.
+- **Label** (Figtree, weight 500, `text-xs`/`0.75rem`): nav group headers (`tracking-wider uppercase`, the only intentional eyebrow and reserved for nav grouping), badge text, table headers, compact metadata.
+- **Mono** (JetBrains Mono, weight 400, `text-sm`/`0.875rem` → `0.8125rem` for tight identifier rows): device IDs, JIDs, webhook secrets, event codes, push names. Apply via `font-mono`.
+
+### Named Rules
+
+**The Mono-for-Identifiers Rule.** Anything an operator might copy, compare, or scan — a device ID, a JID, a webhook secret, an event code, a push name — is set in JetBrains Mono. Proportional type is for prose and labels; mono is for data the user verifies.
+
+**The No-Fluid-Type Rule.** Product UI holds a fixed rem scale. No `clamp()` on headings. Users view at consistent DPI, and a fluid H1 that shrinks in a sidebar looks worse, not better. The only responsive type move is structural: collapse the sidebar into a Sheet below `md`.
+
+**The Uppercase-Eyebrow Reservation Rule.** The `tracking-wider uppercase` treatment is reserved for nav group headers ("Overview", "Messaging", "Directory", "System") — a single deliberate system, not a per-section reflex. Do not add uppercase eyebrows above page sections, card groups, or form fieldsets.
+
+## 4. Elevation
+
+**Flat by default, lift on interaction.** This system does not use shadows as ambient decoration. Cards, inputs, and popovers read as surfaces through background tone and a 1px ring — not through drop shadows. Depth appears only as a response to state: a card lifts on hover, a popover sits above content via a tonal step plus the ring.
+
+### Shadow Vocabulary
+- **Resting:** none. Cards use `ring-1 ring-foreground/10` (a 1px ring at 10% foreground opacity), not a shadow.
+- **Hover lift** (`.card-lift` utility: `transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md`): the only place `shadow-md` appears. A 2px upward translate plus Tailwind's `shadow-md`. Reserved for genuinely interactive cards (e.g. a device card you can click to select).
+- **Popover/Dialog:** shadcn defaults carry a subtle shadow via Radix; this is acceptable because it encodes "this floats above content," not decoration.
+
+### Named Rules
+
+**The Flat-By-Default Rule.** Surfaces are flat at rest. A card with both a 1px border AND a soft wide drop shadow (≥16px blur) is the codex ghost-card tell and is prohibited — pick the ring or a small (≤8px) shadow, never both as decoration.
+
+**The Depth-Means-State Rule.** When you reach for a shadow, ask what state it encodes. Hover, elevation, focus — valid. "Looks nice" — not valid. If the answer is decoration, use tone or the ring instead.
+
+## 5. Components
+
+Every component leads with shape, then color assignment, then states. The whole vocabulary is shadcn/ui (`radix-nova` style) on Radix primitives; preserve it on custom controls.
+
+### Buttons
+- **Shape:** gently rounded (`rounded-lg` ≈ `0.875rem`), compact (`h-8` default, `h-7` small, `h-9` large). Never the over-rounded 24–32px card radius; buttons cap at `rounded-lg`.
+- **Primary** (`button-primary`): Steel Blue bg, Cool Paper text, `text-sm font-medium`, `px-2.5`. Hover dims to 80% (`hover:bg-primary/80`) — a subtle state change, not a gradient. Focus: `ring-3 ring-ring/50` + `border-ring`.
+- **Outline** (`button-outline`): Pale Steel border on Cool Paper bg; hover shifts to Console Mist bg. The default non-primary action.
+- **Ghost** (`button-ghost`): transparent; hover shifts to Console Mist. Used in toolbars and icon buttons (theme toggle, mobile menu, device-card menu).
+- **Destructive** (`button-destructive`): 10% Destructive tint bg + full Destructive text — never a solid red button outside AlertDialog confirmations. Hover deepens to 20% tint.
+- **Link** (`button-link`): Steel Blue text, underline on hover.
+- **Icon buttons** (`size="icon"` → `size-8`): ghost variant, square. Always paired with `aria-label` (see theme-toggle, mobile menu).
+- **Sizes:** `xs` (`h-6`), `sm` (`h-7`), default (`h-8`), `lg` (`h-9`), plus `icon-xs/sm/lg`. The default IS the size; reach for `lg` only on connection/CTA moments (the connect form's submit).
+
+### Badges
+- **Shape:** full pill (`rounded-4xl`), compact (`h-5`, `px-2`, `text-xs`).
+- **Default:** Steel Blue bg + Cool Paper text.
+- **Secondary:** Console Mist-tinted bg, used as the base for status badges.
+- **State Badge pattern** (`StateBadge`): `variant="secondary"` overridden with a signal-hue tint — `bg-emerald-500/15 text-emerald-600` for logged_in, sky for connected, amber for connecting, muted for disconnected. Always paired with the plain-word label ("Logged in", "Connected", "Connecting", "Disconnected").
+- **Destructive:** 10% red tint + red text (mirrors the destructive button).
+
+### Cards / Containers
+- **Corner:** `rounded-xl` (≈ `1.225rem`) — the largest radius in the system. Cards and nothing else.
+- **Background:** Card White (light) / `oklch(0.22 0.016 235)` (dark).
+- **Border/ring:** `ring-1 ring-foreground/10` — no shadow at rest.
+- **Padding:** `--card-spacing: 1rem` default, `0.75rem` for `size="sm"`. Header/content share the horizontal padding; footer adds a top border + `bg-muted/50`.
+- **No nested cards.** A card inside a card is always wrong; use a tonal panel or plain div.
+
+### Inputs / Fields
+- **Shape:** `rounded-lg`, `h-8` (matches buttons), full-width, `px-2.5 py-1`.
+- **Style:** Pale Steel border, transparent bg, `text-base` on mobile → `md:text-sm` (prevents iOS zoom).
+- **Focus:** `border-ring` + `ring-3 ring-ring/50`. No glow, no color shift — the ring is the signal.
+- **Error:** `aria-invalid` swaps border to Destructive + adds `ring-3 ring-destructive/20`.
+- **Disabled:** `bg-input/50`, `pointer-events-none`, `opacity-50`.
+
+### Navigation
+- **Sidebar:** `w-60`, Sidebar-tinted bg (one step lifted from body), `border-r`. Collapses into a left `Sheet` below `md`.
+- **Nav item:** `rounded-full` pill (the only pill outside badges), `px-3 py-2`, `text-sm font-medium`, Graphite inactive text. Hover: `bg-sidebar-accent/50`. Active: Steel Blue-tinted accent bg + accent-foreground text.
+- **Nav group header:** `text-[11px] font-medium tracking-wider uppercase text-muted-foreground` — the reserved eyebrow treatment, one per group.
+- **Top bar:** `h-14`, `border-b`, holds mobile menu + logo (mobile), device switcher, WsBadge, theme toggle.
+
+### WsBadge (signature)
+A 10px (`size-2.5`) dot in the top bar that encodes WebSocket state: Live Green + `.live-dot` pulse when connected, Signal Amber + `animate-pulse` when connecting, muted-gray/40 when offline. Wrapped in a Tooltip with the plain-word label ("Live updates connected"). The single most important indicator in the shell — it tells the operator whether what they're seeing is current.
+
+### StateBadge (signature)
+The semantic-status pattern used across device cards, session dialogs, and anywhere device/WebSocket state appears. Secondary badge + signal-hue tint + plain-word label. Color is never the only signal: the word always travels with the hue.
+
+### DeviceCard (signature)
+The primary unit of the dashboard. Avatar + push name (mono ID) + StateBadge + a `...` menu of mutations (login QR, login code, reconnect, logout, webhook, delete). Selecting it scopes the whole app to that device. Delete is gated behind an `AlertDialog`. Embodies the "one surface, every device" principle from PRODUCT.md.
+
+## 6. Do's and Don'ts
+
+### Do:
+- **Do** use Steel Blue (`oklch(0.55 0.09 225)`) as the single brand accent, on ≤10% of any screen: primary buttons, active nav, focus rings, links, default badges.
+- **Do** tint neutrals toward hue 225 (steel blue) at chroma ≤0.02. Cool Paper and Blue-Tinted Charcoal are the canonical surfaces; their faint blue is what makes the surface feel like gowa.
+- **Do** set device IDs, JIDs, webhook secrets, event codes, and push names in JetBrains Mono. An identifier in proportional type is a missed scan.
+- **Do** pair every status color with a plain-word label. StateBadge and WsBadge are the templates: "Logged in" + emerald, "Live updates connected" + live-green.
+- **Do** keep controls compact: `h-8` buttons and inputs, `h-5` badges, `text-sm` body. The default size IS the size.
+- **Do** gate every animation behind `@media (prefers-reduced-motion: reduce)`. The `.stagger`, `.live-dot`, and `.card-lift` utilities already do this; new ones must too.
+- **Do** convey depth with the 1px ring (`ring-1 ring-foreground/10`) and background tone first, shadows only on hover.
+- **Do** label icon-only buttons with `aria-label` (theme toggle: "Toggle theme", mobile menu: "Open navigation").
+- **Do** write verb+object button labels: "Delete device", "Reconnect", "Copy cURL", not "OK" or "Yes".
+
+### Don't:
+- **Don't** use the generic SaaS dashboard template — no indigo-to-violet gradient heroes, no big-number-with-tiny-label metric strips, no identical icon-heading-text card grids. (Directly from PRODUCT.md's anti-references.)
+- **Don't** apply gradient text (`background-clip: text` + gradient), glassmorphism, or side-stripe accent borders (`border-left > 1px` as a colored stripe). These are absolute bans.
+- **Don't** add a `tracking-wider uppercase` eyebrow above every section. That treatment is reserved for nav group headers.
+- **Don't** pair a 1px border with a ≥16px-blur drop shadow on the same element. That's the ghost-card tell — pick the ring or a small (≤8px) shadow, not both.
+- **Don't** round cards past `rounded-xl` (≈1.225rem). 24–32px+ radii on cards are the over-rounding tell; full-pill is for badges and nav items only.
+- **Don't** use a second "brand-ish" color when Steel Blue feels tired. The answer is a neutral or a Signal hue, not a new accent.
+- **Don't** use color as the only signal for state. A green dot alone is inaccessible; a green dot + "Connected" label is correct.
+- **Don't** use Signal hues (emerald/sky/amber) for decoration. They encode device/WebSocket state and nothing else.
+- **Don't** put a card inside a card. Use a tonal panel or a plain div.
+- **Don't** use a display font (Bricolage Grotesque) in UI labels, buttons, or data. Display is for H1–H3 only.
+- **Don't** add orchestrated page-load choreography. The `.stagger` entrance is the one permitted entrance and it's subtle; users load into a task, they don't want to watch the page assemble.

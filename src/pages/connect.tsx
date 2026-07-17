@@ -45,15 +45,16 @@ export default function ConnectPage() {
   }
 
   return (
-    <div className="bg-background relative flex min-h-svh items-center justify-center overflow-hidden p-4">
-      <div
-        aria-hidden
-        className="bg-[radial-gradient(ellipse_at_top,--theme(--color-primary/12%),transparent_60%)] pointer-events-none absolute inset-0"
-      />
-      <Card className="animate-in fade-in slide-in-from-bottom-2 relative w-full max-w-md duration-500">
+    <div className="bg-background flex min-h-svh items-center justify-center p-4">
+      <Card className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 w-full max-w-md motion-safe:duration-500">
         <CardHeader>
-          <Logo className="mb-2 [&_img]:size-10 [&_span]:text-xl" />
-          <CardTitle>Connect to your gowa server</CardTitle>
+          <div className="flex flex-col gap-1">
+            <Logo className="[&_img]:size-10 [&_span]:text-xl" />
+            <p className="text-muted-foreground text-xs">
+              Web dashboard for go-whatsapp-web-multidevice
+            </p>
+          </div>
+          <CardTitle className="mt-1">Connect to your gowa server</CardTitle>
           <CardDescription>
             The server URL and optional basic-auth credentials are stored in this browser only.
           </CardDescription>
