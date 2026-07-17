@@ -1,9 +1,8 @@
 import { useState, type FormEvent } from 'react'
-import { Loader2 } from 'lucide-react'
-import { sendImage } from '@/api/send'
+import { imageRequest, sendImage } from '@/api/send'
+import { FormActions } from '@/components/shared/curl-dialog'
 import { FileOrUrlInput, type FileOrUrl } from '@/components/shared/file-or-url-input'
 import { ResultPanel } from '@/components/shared/result-panel'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -19,18 +18,20 @@ export function SendImageForm() {
 
   const mutation = useActionMutation(sendImage, { successMessage: 'Image sent' })
 
+  const payload = {
+    phone: jid,
+    file: source.file,
+    fileUrl: source.url || undefined,
+    caption,
+    view_once: viewOnce,
+    compress,
+    // view_once messages cannot be forwarded per the WhatsApp protocol
+    is_forwarded: false,
+  }
+
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
-    mutation.mutate({
-      phone: jid,
-      file: source.file,
-      fileUrl: source.url || undefined,
-      caption,
-      view_once: viewOnce,
-      compress,
-      // view_once messages cannot be forwarded per the WhatsApp protocol
-      is_forwarded: false,
-    })
+    mutation.mutate(payload)
   }
 
   return (
@@ -52,10 +53,12 @@ export function SendImageForm() {
         <Switch checked={compress} onCheckedChange={setCompress} />
         Compress
       </label>
-      <Button type="submit" disabled={mutation.isPending || !jid} className="self-start">
-        {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
-        Send image
-      </Button>
+      <FormActions
+        submitLabel="Send image"
+        pending={mutation.isPending}
+        disabled={!jid}
+        request={imageRequest(payload)}
+      />
       <ResultPanel result={mutation.data} />
     </form>
   )

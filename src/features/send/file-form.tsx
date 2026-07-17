@@ -1,9 +1,8 @@
 import { useState, type FormEvent } from 'react'
-import { Loader2 } from 'lucide-react'
-import { sendFile } from '@/api/send'
+import { fileRequest, sendFile } from '@/api/send'
+import { FormActions } from '@/components/shared/curl-dialog'
 import { FileOrUrlInput, type FileOrUrl } from '@/components/shared/file-or-url-input'
 import { ResultPanel } from '@/components/shared/result-panel'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useActionMutation } from '@/hooks/use-action-mutation'
@@ -16,14 +15,16 @@ export function SendFileForm() {
 
   const mutation = useActionMutation(sendFile, { successMessage: 'File sent' })
 
+  const payload = {
+    phone: jid,
+    file: source.file,
+    fileUrl: source.url || undefined,
+    caption,
+  }
+
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
-    mutation.mutate({
-      phone: jid,
-      file: source.file,
-      fileUrl: source.url || undefined,
-      caption,
-    })
+    mutation.mutate(payload)
   }
 
   return (
@@ -37,10 +38,12 @@ export function SendFileForm() {
           onChange={(event) => setCaption(event.target.value)}
         />
       </div>
-      <Button type="submit" disabled={mutation.isPending || !jid} className="self-start">
-        {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
-        Send file
-      </Button>
+      <FormActions
+        submitLabel="Send file"
+        pending={mutation.isPending}
+        disabled={!jid}
+        request={fileRequest(payload)}
+      />
       <ResultPanel result={mutation.data} />
     </form>
   )

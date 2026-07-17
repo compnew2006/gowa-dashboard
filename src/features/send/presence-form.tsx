@@ -1,8 +1,7 @@
 import { useState, type FormEvent } from 'react'
-import { Loader2 } from 'lucide-react'
-import { sendPresence } from '@/api/send'
+import { presenceRequest, sendPresence } from '@/api/send'
+import { FormActions } from '@/components/shared/curl-dialog'
 import { ResultPanel } from '@/components/shared/result-panel'
-import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -18,9 +17,11 @@ export function SendPresenceForm() {
 
   const mutation = useActionMutation(sendPresence, { successMessage: 'Presence updated' })
 
+  const payload = { type }
+
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
-    mutation.mutate({ type })
+    mutation.mutate(payload)
   }
 
   return (
@@ -37,10 +38,12 @@ export function SendPresenceForm() {
           </SelectContent>
         </Select>
       </div>
-      <Button type="submit" disabled={mutation.isPending} className="self-start">
-        {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
-        Update presence
-      </Button>
+      <FormActions
+        submitLabel="Update presence"
+        pending={mutation.isPending}
+        disabled={false}
+        request={presenceRequest(payload)}
+      />
       <ResultPanel result={mutation.data} />
     </form>
   )

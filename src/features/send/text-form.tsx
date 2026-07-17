@@ -1,8 +1,7 @@
 import { useState, type FormEvent } from 'react'
-import { Loader2 } from 'lucide-react'
-import { sendText } from '@/api/send'
+import { sendText, textRequest } from '@/api/send'
+import { FormActions } from '@/components/shared/curl-dialog'
 import { ResultPanel } from '@/components/shared/result-panel'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -16,13 +15,15 @@ export function SendTextForm() {
 
   const mutation = useActionMutation(sendText, { successMessage: 'Message sent' })
 
+  const payload = {
+    phone: jid,
+    message,
+    reply_message_id: replyId || undefined,
+  }
+
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
-    mutation.mutate({
-      phone: jid,
-      message,
-      reply_message_id: replyId || undefined,
-    })
+    mutation.mutate(payload)
   }
 
   return (
@@ -45,10 +46,12 @@ export function SendTextForm() {
           onChange={(event) => setReplyId(event.target.value)}
         />
       </div>
-      <Button type="submit" disabled={mutation.isPending || !jid} className="self-start">
-        {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
-        Send message
-      </Button>
+      <FormActions
+        submitLabel="Send message"
+        pending={mutation.isPending}
+        disabled={!jid}
+        request={textRequest(payload)}
+      />
       <ResultPanel result={mutation.data} />
     </form>
   )

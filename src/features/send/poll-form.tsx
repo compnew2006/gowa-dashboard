@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
-import { Loader2, Plus, X } from 'lucide-react'
-import { sendPoll } from '@/api/send'
+import { Plus, X } from 'lucide-react'
+import { pollRequest, sendPoll } from '@/api/send'
+import { FormActions } from '@/components/shared/curl-dialog'
 import { ResultPanel } from '@/components/shared/result-panel'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,14 +22,16 @@ export function SendPollForm() {
   const addOption = () => setOptions((prev) => [...prev, ''])
   const removeOption = (index: number) => setOptions((prev) => prev.filter((_, i) => i !== index))
 
+  const payload = {
+    phone: jid,
+    question,
+    options: options.map((option) => option.trim()).filter(Boolean),
+    max_answer: maxAnswer,
+  }
+
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
-    mutation.mutate({
-      phone: jid,
-      question,
-      options: options.map((option) => option.trim()).filter(Boolean),
-      max_answer: maxAnswer,
-    })
+    mutation.mutate(payload)
   }
 
   return (
@@ -83,10 +86,12 @@ export function SendPollForm() {
           onChange={(event) => setMaxAnswer(Number(event.target.value))}
         />
       </div>
-      <Button type="submit" disabled={mutation.isPending || !jid} className="self-start">
-        {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
-        Send poll
-      </Button>
+      <FormActions
+        submitLabel="Send poll"
+        pending={mutation.isPending}
+        disabled={!jid}
+        request={pollRequest(payload)}
+      />
       <ResultPanel result={mutation.data} />
     </form>
   )

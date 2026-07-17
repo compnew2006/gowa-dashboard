@@ -1,8 +1,7 @@
 import { useState, type FormEvent } from 'react'
-import { Loader2 } from 'lucide-react'
-import { sendLocation } from '@/api/send'
+import { locationRequest, sendLocation } from '@/api/send'
+import { FormActions } from '@/components/shared/curl-dialog'
 import { ResultPanel } from '@/components/shared/result-panel'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useActionMutation } from '@/hooks/use-action-mutation'
@@ -15,13 +14,15 @@ export function SendLocationForm() {
 
   const mutation = useActionMutation(sendLocation, { successMessage: 'Location sent' })
 
+  const payload = {
+    phone: jid,
+    latitude,
+    longitude,
+  }
+
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
-    mutation.mutate({
-      phone: jid,
-      latitude,
-      longitude,
-    })
+    mutation.mutate(payload)
   }
 
   return (
@@ -46,10 +47,12 @@ export function SendLocationForm() {
           required
         />
       </div>
-      <Button type="submit" disabled={mutation.isPending || !jid} className="self-start">
-        {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
-        Send location
-      </Button>
+      <FormActions
+        submitLabel="Send location"
+        pending={mutation.isPending}
+        disabled={!jid}
+        request={locationRequest(payload)}
+      />
       <ResultPanel result={mutation.data} />
     </form>
   )

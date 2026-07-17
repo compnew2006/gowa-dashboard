@@ -1,15 +1,16 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { Loader2 } from 'lucide-react'
 import {
-  deleteMessage,
-  forwardMessage,
-  markRead,
-  reactMessage,
-  revokeMessage,
-  starMessage,
-  unstarMessage,
-  updateMessage,
+  deleteRequest,
+  forwardRequest,
+  reactRequest,
+  readRequest,
+  revokeRequest,
+  starRequest,
+  unstarRequest,
+  updateRequest,
 } from '@/api/message'
+import { exec, type ApiRequest } from '@/api/request'
+import { FormActions } from '@/components/shared/curl-dialog'
 import { ResultPanel } from '@/components/shared/result-panel'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,29 +18,30 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useActionMutation } from '@/hooks/use-action-mutation'
 import { useRecipientJid } from '@/stores/recipient'
+import type { SendResult } from '@/api/send'
 
 export interface MessageActionProps {
   messageId: string
 }
 
-/** Shared shell: submit + result. Recipient and message ID come from the workspace. */
-function MessageActionForm<TData>({
+/** Shared shell: submit + cURL + result. Recipient and message ID come from the workspace. */
+function MessageActionForm({
   messageId,
   submitLabel,
   successMessage,
-  run,
+  request,
   children,
   extraValid = true,
 }: MessageActionProps & {
   submitLabel: string
   successMessage: string
-  run: (messageId: string, phone: string) => Promise<TData>
+  request: (messageId: string, phone: string) => ApiRequest
   children?: ReactNode
   extraValid?: boolean
 }) {
   const jid = useRecipientJid()
   const mutation = useActionMutation((vars: { messageId: string; phone: string }) =>
-    run(vars.messageId, vars.phone),
+    exec<SendResult>(request(vars.messageId, vars.phone)),
   )
 
   const onSubmit = (event: FormEvent) => {
@@ -50,14 +52,12 @@ function MessageActionForm<TData>({
   return (
     <form className="flex flex-col gap-4" onSubmit={onSubmit}>
       {children}
-      <Button
-        type="submit"
-        disabled={mutation.isPending || !messageId.trim() || !jid || !extraValid}
-        className="self-start"
-      >
-        {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
-        {submitLabel}
-      </Button>
+      <FormActions
+        submitLabel={submitLabel}
+        pending={mutation.isPending}
+        disabled={!messageId.trim() || !jid || !extraValid}
+        request={request(messageId.trim(), jid)}
+      />
       {mutation.isSuccess && <ResultPanel result={{ status: successMessage }} />}
     </form>
   )
@@ -71,7 +71,7 @@ export function ReactForm({ messageId }: MessageActionProps) {
       submitLabel="Send reaction"
       successMessage="Reaction sent"
       extraValid={emoji.trim().length > 0}
-      run={(id, phone) => reactMessage(id, { phone, emoji })}
+      request={(id, phone) => reactRequest(id, { phone, emoji })}
     >
       <div className="flex flex-col gap-2">
         <Label>Emoji</Label>
@@ -93,7 +93,7 @@ export function UpdateForm({ messageId }: MessageActionProps) {
       submitLabel="Update message"
       successMessage="Message updated"
       extraValid={message.trim().length > 0}
-      run={(id, phone) => updateMessage(id, { phone, message })}
+      request={(id, phone) => updateRequest(id, { phone, message })}
     >
       <div className="flex flex-col gap-2">
         <Label>New text</Label>
@@ -109,7 +109,7 @@ export function DeleteForm({ messageId }: MessageActionProps) {
       messageId={messageId}
       submitLabel="Delete for everyone"
       successMessage="Message deleted"
-      run={(id, phone) => deleteMessage(id, { phone })}
+      request={(id, phone) => deleteRequest(id, { phone })}
     />
   )
 }
@@ -120,7 +120,7 @@ export function RevokeForm({ messageId }: MessageActionProps) {
       messageId={messageId}
       submitLabel="Revoke message"
       successMessage="Message revoked"
-      run={(id, phone) => revokeMessage(id, { phone })}
+      request={(id, phone) => revokeRequest(id, { phone })}
     />
   )
 }
@@ -131,7 +131,7 @@ export function ReadForm({ messageId }: MessageActionProps) {
       messageId={messageId}
       submitLabel="Mark as read"
       successMessage="Marked as read"
-      run={(id, phone) => markRead(id, { phone })}
+      request={(id, phone) => readRequest(id, { phone })}
     />
   )
 }
@@ -143,7 +143,7 @@ export function StarForm({ messageId }: MessageActionProps) {
       messageId={messageId}
       submitLabel={starred ? 'Star message' : 'Unstar message'}
       successMessage={starred ? 'Message starred' : 'Message unstarred'}
-      run={(id, phone) => (starred ? starMessage(id, { phone }) : unstarMessage(id, { phone }))}
+      request={(id, phone) => (starred ? starRequest(id, { phone }) : unstarRequest(id, { phone }))}
     >
       <div className="flex gap-2">
         <Button
@@ -174,7 +174,7 @@ export function ForwardForm({ messageId }: MessageActionProps) {
       messageId={messageId}
       submitLabel="Forward message"
       successMessage="Message forwarded"
-      run={(id, phone) => forwardMessage(id, { phone, force_reupload: reupload })}
+      request={(id, phone) => forwardRequest(id, { phone, force_reupload: reupload })}
     >
       <label className="text-muted-foreground flex items-center gap-2 text-sm">
         <input

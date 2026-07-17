@@ -1,28 +1,8 @@
-import { http, results } from '@/lib/http'
+import { clean, exec, type ApiRequest } from '@/api/request'
 
 export interface SendResult {
   message_id: string
   status: string
-}
-
-function send(path: string, body: object): Promise<SendResult> {
-  return results(http.post(path, body))
-}
-
-/** Build multipart form data, skipping empty/undefined values. */
-function formData(
-  fields: Record<string, string | number | boolean | File | undefined | null>,
-): FormData {
-  const data = new FormData()
-  for (const [key, value] of Object.entries(fields)) {
-    if (value === undefined || value === null || value === '') continue
-    data.append(key, value instanceof File ? value : String(value))
-  }
-  return data
-}
-
-function sendForm(path: string, data: FormData): Promise<SendResult> {
-  return results(http.post(path, data))
 }
 
 export interface TextPayload {
@@ -33,8 +13,12 @@ export interface TextPayload {
   duration?: number
 }
 
+export function textRequest(payload: TextPayload): ApiRequest {
+  return { method: 'POST', path: '/send/message', json: clean(payload) }
+}
+
 export function sendText(payload: TextPayload): Promise<SendResult> {
-  return send('/send/message', clean(payload))
+  return exec(textRequest(payload))
 }
 
 export interface MediaPayload {
@@ -47,12 +31,13 @@ export interface MediaPayload {
   duration?: number
 }
 
-export function sendImage(
-  p: MediaPayload & { view_once?: boolean; compress?: boolean },
-): Promise<SendResult> {
-  return sendForm(
-    '/send/image',
-    formData({
+export type ImagePayload = MediaPayload & { view_once?: boolean; compress?: boolean }
+
+export function imageRequest(p: ImagePayload): ApiRequest {
+  return {
+    method: 'POST',
+    path: '/send/image',
+    form: {
       phone: p.phone,
       caption: p.caption,
       image: p.file,
@@ -62,14 +47,19 @@ export function sendImage(
       is_forwarded: p.is_forwarded,
       reply_message_id: p.reply_message_id,
       duration: p.duration,
-    }),
-  )
+    },
+  }
 }
 
-export function sendFile(p: MediaPayload): Promise<SendResult> {
-  return sendForm(
-    '/send/file',
-    formData({
+export function sendImage(p: ImagePayload): Promise<SendResult> {
+  return exec(imageRequest(p))
+}
+
+export function fileRequest(p: MediaPayload): ApiRequest {
+  return {
+    method: 'POST',
+    path: '/send/file',
+    form: {
       phone: p.phone,
       caption: p.caption,
       file: p.file,
@@ -77,16 +67,25 @@ export function sendFile(p: MediaPayload): Promise<SendResult> {
       reply_message_id: p.reply_message_id,
       is_forwarded: p.is_forwarded,
       duration: p.duration,
-    }),
-  )
+    },
+  }
 }
 
-export function sendVideo(
-  p: MediaPayload & { view_once?: boolean; compress?: boolean; gif_playback?: boolean },
-): Promise<SendResult> {
-  return sendForm(
-    '/send/video',
-    formData({
+export function sendFile(p: MediaPayload): Promise<SendResult> {
+  return exec(fileRequest(p))
+}
+
+export type VideoPayload = MediaPayload & {
+  view_once?: boolean
+  compress?: boolean
+  gif_playback?: boolean
+}
+
+export function videoRequest(p: VideoPayload): ApiRequest {
+  return {
+    method: 'POST',
+    path: '/send/video',
+    form: {
       phone: p.phone,
       caption: p.caption,
       video: p.file,
@@ -97,83 +96,130 @@ export function sendVideo(
       is_forwarded: p.is_forwarded,
       reply_message_id: p.reply_message_id,
       duration: p.duration,
-    }),
-  )
+    },
+  }
 }
 
-export function sendSticker(p: MediaPayload): Promise<SendResult> {
-  return sendForm(
-    '/send/sticker',
-    formData({
+export function sendVideo(p: VideoPayload): Promise<SendResult> {
+  return exec(videoRequest(p))
+}
+
+export function stickerRequest(p: MediaPayload): ApiRequest {
+  return {
+    method: 'POST',
+    path: '/send/sticker',
+    form: {
       phone: p.phone,
       sticker: p.file,
       sticker_url: p.fileUrl,
       is_forwarded: p.is_forwarded,
-    }),
-  )
+    },
+  }
 }
 
-export function sendAudio(p: MediaPayload & { ptt?: boolean }): Promise<SendResult> {
-  return sendForm(
-    '/send/audio',
-    formData({
+export function sendSticker(p: MediaPayload): Promise<SendResult> {
+  return exec(stickerRequest(p))
+}
+
+export type AudioPayload = MediaPayload & { ptt?: boolean }
+
+export function audioRequest(p: AudioPayload): ApiRequest {
+  return {
+    method: 'POST',
+    path: '/send/audio',
+    form: {
       phone: p.phone,
       audio: p.file,
       audio_url: p.fileUrl,
       ptt: p.ptt,
       reply_message_id: p.reply_message_id,
       is_forwarded: p.is_forwarded,
-    }),
-  )
+    },
+  }
 }
 
-export function sendContact(payload: {
+export function sendAudio(p: AudioPayload): Promise<SendResult> {
+  return exec(audioRequest(p))
+}
+
+export interface ContactPayload {
   phone: string
   contact_name: string
   contact_phone: string
-}): Promise<SendResult> {
-  return send('/send/contact', clean(payload))
 }
 
-export function sendLink(payload: {
+export function contactRequest(payload: ContactPayload): ApiRequest {
+  return { method: 'POST', path: '/send/contact', json: clean(payload) }
+}
+
+export function sendContact(payload: ContactPayload): Promise<SendResult> {
+  return exec(contactRequest(payload))
+}
+
+export interface LinkPayload {
   phone: string
   link: string
   caption?: string
-}): Promise<SendResult> {
-  return send('/send/link', clean(payload))
 }
 
-export function sendLocation(payload: {
+export function linkRequest(payload: LinkPayload): ApiRequest {
+  return { method: 'POST', path: '/send/link', json: clean(payload) }
+}
+
+export function sendLink(payload: LinkPayload): Promise<SendResult> {
+  return exec(linkRequest(payload))
+}
+
+export interface LocationPayload {
   phone: string
   latitude: string
   longitude: string
-}): Promise<SendResult> {
-  return send('/send/location', clean(payload))
 }
 
-export function sendPoll(payload: {
+export function locationRequest(payload: LocationPayload): ApiRequest {
+  return { method: 'POST', path: '/send/location', json: clean(payload) }
+}
+
+export function sendLocation(payload: LocationPayload): Promise<SendResult> {
+  return exec(locationRequest(payload))
+}
+
+export interface PollPayload {
   phone: string
   question: string
   options: string[]
   max_answer: number
-}): Promise<SendResult> {
-  return send('/send/poll', clean(payload))
 }
 
-export function sendPresence(payload: { type: string }): Promise<SendResult> {
-  return send('/send/presence', payload)
+export function pollRequest(payload: PollPayload): ApiRequest {
+  return { method: 'POST', path: '/send/poll', json: clean(payload) }
 }
 
-export function sendChatPresence(payload: { phone: string; action: string }): Promise<SendResult> {
-  return send('/send/chat-presence', payload)
+export function sendPoll(payload: PollPayload): Promise<SendResult> {
+  return exec(pollRequest(payload))
 }
 
-/** Drop undefined/empty optional fields so the server sees only what was set. */
-function clean<T extends object>(payload: T): T {
-  const out: Record<string, unknown> = {}
-  for (const [key, value] of Object.entries(payload)) {
-    if (value === undefined || value === '') continue
-    out[key] = value
-  }
-  return out as T
+export interface PresencePayload {
+  type: string
+}
+
+export function presenceRequest(payload: PresencePayload): ApiRequest {
+  return { method: 'POST', path: '/send/presence', json: clean(payload) }
+}
+
+export function sendPresence(payload: PresencePayload): Promise<SendResult> {
+  return exec(presenceRequest(payload))
+}
+
+export interface ChatPresencePayload {
+  phone: string
+  action: string
+}
+
+export function chatPresenceRequest(payload: ChatPresencePayload): ApiRequest {
+  return { method: 'POST', path: '/send/chat-presence', json: clean(payload) }
+}
+
+export function sendChatPresence(payload: ChatPresencePayload): Promise<SendResult> {
+  return exec(chatPresenceRequest(payload))
 }

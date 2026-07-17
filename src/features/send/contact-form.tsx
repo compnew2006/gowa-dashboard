@@ -1,8 +1,7 @@
 import { useState, type FormEvent } from 'react'
-import { Loader2 } from 'lucide-react'
-import { sendContact } from '@/api/send'
+import { contactRequest, sendContact } from '@/api/send'
+import { FormActions } from '@/components/shared/curl-dialog'
 import { ResultPanel } from '@/components/shared/result-panel'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useActionMutation } from '@/hooks/use-action-mutation'
@@ -15,13 +14,15 @@ export function SendContactForm() {
 
   const mutation = useActionMutation(sendContact, { successMessage: 'Contact sent' })
 
+  const payload = {
+    phone: jid,
+    contact_name: contactName,
+    contact_phone: contactPhone,
+  }
+
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
-    mutation.mutate({
-      phone: jid,
-      contact_name: contactName,
-      contact_phone: contactPhone,
-    })
+    mutation.mutate(payload)
   }
 
   return (
@@ -45,10 +46,12 @@ export function SendContactForm() {
           required
         />
       </div>
-      <Button type="submit" disabled={mutation.isPending || !jid} className="self-start">
-        {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
-        Send contact
-      </Button>
+      <FormActions
+        submitLabel="Send contact"
+        pending={mutation.isPending}
+        disabled={!jid}
+        request={contactRequest(payload)}
+      />
       <ResultPanel result={mutation.data} />
     </form>
   )

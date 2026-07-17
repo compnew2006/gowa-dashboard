@@ -1,45 +1,49 @@
+import type { ApiRequest } from '@/api/request'
 import { http, results } from '@/lib/http'
-import type { SendResult } from '@/api/send'
 
 const enc = encodeURIComponent
 
-export function reactMessage(messageId: string, payload: { phone: string; emoji: string }) {
-  return results<SendResult>(http.post(`/message/${enc(messageId)}/reaction`, payload))
+function messageRequest(
+  messageId: string,
+  action: string,
+  json: Record<string, unknown>,
+): ApiRequest {
+  return { method: 'POST', path: `/message/${enc(messageId)}/${action}`, json }
 }
 
-export function revokeMessage(messageId: string, payload: { phone: string }) {
-  return results<SendResult>(http.post(`/message/${enc(messageId)}/revoke`, payload))
+export function reactRequest(messageId: string, payload: { phone: string; emoji: string }) {
+  return messageRequest(messageId, 'reaction', payload)
 }
 
-export function deleteMessage(messageId: string, payload: { phone: string }) {
-  return results<SendResult>(http.post(`/message/${enc(messageId)}/delete`, payload))
+export function revokeRequest(messageId: string, payload: { phone: string }) {
+  return messageRequest(messageId, 'revoke', payload)
 }
 
-export function updateMessage(messageId: string, payload: { phone: string; message: string }) {
-  return results<SendResult>(http.post(`/message/${enc(messageId)}/update`, payload))
+export function deleteRequest(messageId: string, payload: { phone: string }) {
+  return messageRequest(messageId, 'delete', payload)
 }
 
-export function markRead(messageId: string, payload: { phone: string }) {
-  return results<SendResult>(http.post(`/message/${enc(messageId)}/read`, payload))
+export function updateRequest(messageId: string, payload: { phone: string; message: string }) {
+  return messageRequest(messageId, 'update', payload)
 }
 
-export function starMessage(messageId: string, payload: { phone: string }) {
-  return results<SendResult>(
-    http.post(`/message/${enc(messageId)}/star`, { ...payload, is_starred: true }),
-  )
+export function readRequest(messageId: string, payload: { phone: string }) {
+  return messageRequest(messageId, 'read', payload)
 }
 
-export function unstarMessage(messageId: string, payload: { phone: string }) {
-  return results<SendResult>(
-    http.post(`/message/${enc(messageId)}/unstar`, { ...payload, is_starred: false }),
-  )
+export function starRequest(messageId: string, payload: { phone: string }) {
+  return messageRequest(messageId, 'star', { ...payload, is_starred: true })
 }
 
-export function forwardMessage(
+export function unstarRequest(messageId: string, payload: { phone: string }) {
+  return messageRequest(messageId, 'unstar', { ...payload, is_starred: false })
+}
+
+export function forwardRequest(
   messageId: string,
   payload: { phone: string; force_reupload?: boolean },
 ) {
-  return results<SendResult>(http.post(`/message/${enc(messageId)}/forward`, payload))
+  return messageRequest(messageId, 'forward', payload)
 }
 
 export interface DownloadedMedia {

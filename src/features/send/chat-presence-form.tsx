@@ -1,8 +1,7 @@
 import { useState, type FormEvent } from 'react'
-import { Loader2 } from 'lucide-react'
-import { sendChatPresence } from '@/api/send'
+import { chatPresenceRequest, sendChatPresence } from '@/api/send'
+import { FormActions } from '@/components/shared/curl-dialog'
 import { ResultPanel } from '@/components/shared/result-panel'
-import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -20,12 +19,14 @@ export function SendChatPresenceForm() {
 
   const mutation = useActionMutation(sendChatPresence, { successMessage: 'Chat presence sent' })
 
+  const payload = {
+    phone: jid,
+    action,
+  }
+
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
-    mutation.mutate({
-      phone: jid,
-      action,
-    })
+    mutation.mutate(payload)
   }
 
   return (
@@ -42,10 +43,12 @@ export function SendChatPresenceForm() {
           </SelectContent>
         </Select>
       </div>
-      <Button type="submit" disabled={mutation.isPending || !jid} className="self-start">
-        {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
-        Send chat presence
-      </Button>
+      <FormActions
+        submitLabel="Send chat presence"
+        pending={mutation.isPending}
+        disabled={!jid}
+        request={chatPresenceRequest(payload)}
+      />
       <ResultPanel result={mutation.data} />
     </form>
   )
