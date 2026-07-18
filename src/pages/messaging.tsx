@@ -16,6 +16,7 @@ import {
   Video,
 } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
+import { PageSurface } from '@/components/shared/page-surface'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -231,36 +232,38 @@ export default function MessagingPage() {
   const device = useSelectedDevice()
 
   return (
-    <>
-      <PageHeader
-        title="Messaging"
-        description="Pick a recipient once, then compose messages or act on existing ones."
-      />
-      {device === null ? (
-        <DeviceGuard />
-      ) : (
-        <>
-          <RecipientBar />
-          <Tabs defaultValue="compose">
-            <TabsList>
-              <TabsTrigger value="compose">
-                <Send className="size-4" />
-                Compose
-              </TabsTrigger>
-              <TabsTrigger value="act">
-                <ListChecks className="size-4" />
-                Act on a message
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="compose">
-              <ComposePanel />
-            </TabsContent>
-            <TabsContent value="act">
-              <ActPanel />
-            </TabsContent>
-          </Tabs>
-        </>
-      )}
-    </>
+    <PageSurface padded>
+      <div className="mx-auto flex max-w-5xl flex-col gap-5">
+        <PageHeader
+          title="Messaging"
+          description="Pick a recipient once, then compose messages or act on existing ones."
+        />
+        {device === null ? (
+          <DeviceGuard />
+        ) : (
+          <>
+            <RecipientBar />
+            <Tabs defaultValue="compose">
+              <TabsList>
+                <TabsTrigger value="compose">
+                  <Send className="size-4" />
+                  Compose
+                </TabsTrigger>
+                <TabsTrigger value="act">
+                  <ListChecks className="size-4" />
+                  Act on a message
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="compose">
+                <ComposePanel />
+              </TabsContent>
+              <TabsContent value="act">
+                <ActPanel />
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
+      </div>
+    </PageSurface>
   )
 }

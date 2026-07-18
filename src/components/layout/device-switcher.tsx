@@ -19,7 +19,13 @@ const stateDots: Record<DeviceState, string> = {
   disconnected: 'bg-muted-foreground/40',
 }
 
-export function DeviceSwitcher() {
+export function DeviceSwitcher({
+  className,
+  onValueChange,
+}: {
+  className?: string
+  onValueChange?: (deviceId: string) => void
+}) {
   const { data: devices } = useDevices()
   const selectedDeviceId = useDeviceStore((state) => state.selectedDeviceId)
   const selectDevice = useDeviceStore((state) => state.selectDevice)
@@ -32,9 +38,14 @@ export function DeviceSwitcher() {
 
   if (!devices?.length) return null
 
+  const handleValueChange = (deviceId: string) => {
+    selectDevice(deviceId)
+    onValueChange?.(deviceId)
+  }
+
   return (
-    <Select value={selectedDeviceId ?? undefined} onValueChange={selectDevice}>
-      <SelectTrigger size="sm" className="w-36 sm:w-44 md:w-56">
+    <Select value={selectedDeviceId ?? undefined} onValueChange={handleValueChange}>
+      <SelectTrigger size="sm" className={cn('w-36 sm:w-44 md:w-56', className)}>
         <Smartphone className="text-muted-foreground size-4 shrink-0" />
         <SelectValue placeholder="Select device" />
       </SelectTrigger>

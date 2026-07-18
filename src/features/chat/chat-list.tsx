@@ -4,6 +4,7 @@ import { Loader2, Search } from 'lucide-react'
 import { listChats, type ChatInfo } from '@/api/chat'
 import { ChatAvatar } from '@/features/chat/chat-avatar'
 import { Button } from '@/components/ui/button'
+import { DeviceSwitcher } from '@/components/layout/device-switcher'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -12,6 +13,7 @@ import { useDevices } from '@/hooks/use-devices'
 import { useSelectedDevice } from '@/hooks/use-device-guard'
 import { formatUnread, useUnreadCount } from '@/hooks/use-unread-count'
 import { useUnreadBumpFromChats } from '@/hooks/use-unread-bump'
+import { useChatScroll } from '@/hooks/use-chat-scroll'
 import type { MergedChatRow } from '@/lib/multi-device-merge'
 import { formatDate, isZeroTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -183,6 +185,10 @@ export function ChatList({
   // row (F2.6). The hook is called unconditionally so its own internal hooks
   // stay stable across mode toggles.
   useUnreadBumpFromChats(isAllMode ? null : deviceId, isAllMode ? [] : thisDeviceChats, selectedJid)
+  // Reveal the polished scrollbar thumb only while scrolling (auto-hides on
+  // idle). The hook is side-effect-only and does not interfere with the
+  // IntersectionObserver-driven infinite scroll below.
+  useChatScroll(scrollRef, [isAllMode])
 
   useEffect(() => {
     const root = scrollRef.current
@@ -217,28 +223,31 @@ export function ChatList({
             onChange={(event) => setSearch(event.target.value)}
           />
         </div>
-        <div className="flex gap-1" role="group" aria-label="Chat list scope">
-          <Button
-            type="button"
-            size="sm"
-            variant={mode === 'this' ? 'default' : 'outline'}
-            aria-pressed={mode === 'this'}
-            onClick={() => setMode('this')}
-          >
-            This device
-          </Button>
+        <div className="flex items-center gap-1.5">
+          <DeviceSwitcher
+            onValueChange={() => {
+              // Selecting a specific device from the droplist is the
+              // "This device" intent: flip out of All-devices mode so the
+              // list shows that device's chats instead of the merge.
+              if (mode === 'all') setMode('this')
+            }}
+          />
           <Tooltip>
             <TooltipTrigger asChild>
               {/* Span wrapper so the Tooltip can wrap a disabled Button (radix
-                  tooltip does not forward to disabled elements natively). */}
+                  tooltip does not forward to disabled elements natively). The
+                  single "All devices" toggle replaces the old two-button
+                  This/All group: pressed = merge all devices, outline = show
+                  only the device currently picked in the droplist. */}
               <span tabIndex={allDevicesDisabled ? 0 : -1} className="inline-flex">
                 <Button
                   type="button"
                   size="sm"
                   variant={mode === 'all' ? 'default' : 'outline'}
                   aria-pressed={mode === 'all'}
+                  aria-label="Merge chats across all devices"
                   disabled={allDevicesDisabled}
-                  onClick={() => setMode('all')}
+                  onClick={() => setMode(mode === 'all' ? 'this' : 'all')}
                 >
                   All devices
                 </Button>
@@ -255,7 +264,7 @@ export function ChatList({
         </label>
       </div>
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="chat-scroll min-h-0 flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="flex justify-center p-6">
             <Loader2 className="text-muted-foreground size-5 animate-spin" />

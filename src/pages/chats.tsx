@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { MessagesSquare } from 'lucide-react'
 import { ChatList } from '@/features/chat/chat-list'
 import { MessageView } from '@/features/chat/message-view'
+import { PageSurface } from '@/components/shared/page-surface'
 import { PageHeader } from '@/components/shared/page-header'
 import { DeviceGuard, useSelectedDevice } from '@/hooks/use-device-guard'
 import type { ChatInfo } from '@/api/chat'
@@ -25,10 +26,12 @@ export default function ChatsPage() {
 
   if (!selectedDeviceId) {
     return (
-      <div className="flex flex-col gap-4">
-        <PageHeader title="Chats" description="Stored conversations for this device." />
-        <DeviceGuard />
-      </div>
+      <PageSurface padded>
+        <div className="flex flex-col gap-4">
+          <PageHeader title="Chats" description="Stored conversations for this device." />
+          <DeviceGuard />
+        </div>
+      </PageSurface>
     )
   }
 
@@ -38,40 +41,42 @@ export default function ChatsPage() {
   const effectiveDeviceId = conversationDeviceId ?? selectedDeviceId
 
   return (
-    <div className="bg-card flex h-full overflow-hidden rounded-xl border">
-      <aside
-        className={`${mobileShowConversation ? 'hidden md:flex' : 'flex'} w-full shrink-0 flex-col border-r md:w-80 lg:w-96`}
-      >
-        <ChatList
-          selectedJid={selected?.jid ?? null}
-          onSelect={(chat, rowDeviceId) => {
-            setSelected(chat)
-            // An All-devices row carries its owning device id; a This-device
-            // row never passes one, and the conversation falls back to the
-            // global switcher. Resetting on every select keeps stale scoping
-            // from a prior All-devices row from leaking into a This-device row.
-            setConversationDeviceId(rowDeviceId ?? null)
-            setMobileShowConversation(true)
-          }}
-        />
-      </aside>
-
-      <section
-        className={`${mobileShowConversation ? 'flex' : 'hidden md:flex'} min-h-0 flex-1 flex-col`}
-      >
-        {selected ? (
-          <MessageView
-            chat={selected}
-            deviceId={effectiveDeviceId}
-            onBack={() => setMobileShowConversation(false)}
+    <PageSurface scroll={false}>
+      <div className="flex h-full">
+        <aside
+          className={`${mobileShowConversation ? 'hidden md:flex' : 'flex'} w-full shrink-0 flex-col border-r md:w-80 lg:w-96`}
+        >
+          <ChatList
+            selectedJid={selected?.jid ?? null}
+            onSelect={(chat, rowDeviceId) => {
+              setSelected(chat)
+              // An All-devices row carries its owning device id; a This-device
+              // row never passes one, and the conversation falls back to the
+              // global switcher. Resetting on every select keeps stale scoping
+              // from a prior All-devices row from leaking into a This-device row.
+              setConversationDeviceId(rowDeviceId ?? null)
+              setMobileShowConversation(true)
+            }}
           />
-        ) : (
-          <div className="text-muted-foreground flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
-            <MessagesSquare className="size-8" />
-            <p className="text-sm">Select a chat to view its messages</p>
-          </div>
-        )}
-      </section>
-    </div>
+        </aside>
+
+        <section
+          className={`${mobileShowConversation ? 'flex' : 'hidden md:flex'} min-h-0 flex-1 flex-col`}
+        >
+          {selected ? (
+            <MessageView
+              chat={selected}
+              deviceId={effectiveDeviceId}
+              onBack={() => setMobileShowConversation(false)}
+            />
+          ) : (
+            <div className="text-muted-foreground flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
+              <MessagesSquare className="size-8" />
+              <p className="text-sm">Select a chat to view its messages</p>
+            </div>
+          )}
+        </section>
+      </div>
+    </PageSurface>
   )
 }

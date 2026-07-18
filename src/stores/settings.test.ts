@@ -48,3 +48,21 @@ describe('useSettingsStore', () => {
     expect(useSettingsStore.getState().mediaBurstGapMin).toBe(2)
   })
 })
+
+describe('sidebarCollapsed', () => {
+  beforeEach(() => {
+    useSettingsStore.setState({ sidebarCollapsed: false })
+  })
+
+  it('defaults to false (expanded)', () => {
+    useSettingsStore.setState({ sidebarCollapsed: false })
+    expect(useSettingsStore.getState().sidebarCollapsed).toBe(false)
+  })
+
+  it('collapses and expands', () => {
+    useSettingsStore.getState().setSidebarCollapsed(true)
+    expect(useSettingsStore.getState().sidebarCollapsed).toBe(true)
+    useSettingsStore.getState().setSidebarCollapsed(false)
+    expect(useSettingsStore.getState().sidebarCollapsed).toBe(false)
+  })
+})

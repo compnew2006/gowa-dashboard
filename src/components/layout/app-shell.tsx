@@ -4,6 +4,8 @@ import {
   Loader2,
   Menu,
   MessagesSquare,
+  PanelLeftClose,
+  PanelLeft,
   Send,
   Settings,
   UserRound,
@@ -11,7 +13,6 @@ import {
   Wrench,
 } from 'lucide-react'
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { DeviceSwitcher } from '@/components/layout/device-switcher'
 import { Logo } from '@/components/layout/logo'
 import { ThemeToggle } from '@/components/layout/theme-toggle'
 import { UserMenu } from '@/components/layout/user-menu'
@@ -19,9 +20,11 @@ import { WsBadge } from '@/components/layout/ws-badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { PasskeyDialog } from '@/features/session/passkey-dialog'
 import { cn } from '@/lib/utils'
 import { useConnection } from '@/stores/connection'
+import { useSettingsStore } from '@/stores/settings'
 
 const navGroups = [
   {
@@ -51,33 +54,55 @@ const navGroups = [
   },
 ]
 
-function NavContent({ onNavigate }: { onNavigate?: () => void }) {
+function NavContent({
+  onNavigate,
+  collapsed = false,
+}: {
+  onNavigate?: () => void
+  collapsed?: boolean
+}) {
   return (
-    <nav className="flex flex-col gap-4">
+    <nav className={cn('flex flex-col', collapsed ? 'gap-3' : 'gap-4')}>
       {navGroups.map((group) => (
-        <div key={group.label} className="flex flex-col gap-1">
-          <p className="text-muted-foreground px-3 text-[11px] font-medium tracking-wider uppercase">
-            {group.label}
-          </p>
-          {group.items.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
-              onClick={onNavigate}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-2.5 rounded-full px-3 py-2 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                    : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground',
-                )
-              }
-            >
-              <Icon className="size-4" />
-              {label}
-            </NavLink>
-          ))}
+        <div key={group.label} className={cn('flex flex-col', collapsed ? 'gap-0.5' : 'gap-1')}>
+          {!collapsed && (
+            <p className="text-muted-foreground px-3 text-[11px] font-medium tracking-wider uppercase">
+              {group.label}
+            </p>
+          )}
+          {collapsed && group !== navGroups[0] && (
+            <div className="bg-border mx-auto my-1 h-px w-6" aria-hidden />
+          )}
+          {group.items.map(({ to, label, icon: Icon }) => {
+            const link = (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === '/'}
+                onClick={onNavigate}
+                title={collapsed ? label : undefined}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-2.5 rounded-full px-3 py-2 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                      : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground',
+                  )
+                }
+              >
+                <Icon className="size-4 shrink-0" />
+                {!collapsed && label}
+              </NavLink>
+            )
+            return collapsed ? (
+              <Tooltip key={to}>
+                <TooltipTrigger asChild>{link}</TooltipTrigger>
+                <TooltipContent side="right">{label}</TooltipContent>
+              </Tooltip>
+            ) : (
+              link
+            )
+          })}
         </div>
       ))}
     </nav>
@@ -88,6 +113,8 @@ export function AppShell() {
   const status = useConnection((state) => state.status)
   const location = useLocation()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const sidebarCollapsed = useSettingsStore((s) => s.sidebarCollapsed)
+  const setSidebarCollapsed = useSettingsStore((s) => s.setSidebarCollapsed)
 
   if (status === 'booting') {
     return (
@@ -103,12 +130,22 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-svh">
-      <aside className="bg-sidebar text-sidebar-foreground hidden w-60 shrink-0 flex-col border-r md:flex">
-        <div className="flex h-14 items-center border-b px-4">
-          <Logo />
+      <aside
+        className={cn(
+          'bg-sidebar text-sidebar-foreground hidden shrink-0 flex-col border-r transition-[width] duration-200 ease-in-out md:flex',
+          sidebarCollapsed ? 'w-16' : 'w-60',
+        )}
+      >
+        <div
+          className={cn(
+            'flex h-14 items-center border-b',
+            sidebarCollapsed ? 'justify-center px-0' : 'px-4',
+          )}
+        >
+          <Logo iconOnly={sidebarCollapsed} />
         </div>
         <ScrollArea className="flex-1 px-2 py-4">
-          <NavContent />
+          <NavContent collapsed={sidebarCollapsed} />
         </ScrollArea>
       </aside>
 
@@ -129,41 +166,50 @@ export function AppShell() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-between gap-2 border-b px-4">
-          <div className="flex items-center gap-2 md:hidden">
+          <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="icon"
               aria-label="Open navigation"
+              className="md:hidden"
               onClick={() => setMobileNavOpen(true)}
             >
               <Menu className="size-5" />
             </Button>
-            <Logo />
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              className="hidden md:inline-flex"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            >
+              {sidebarCollapsed ? (
+                <PanelLeft className="size-5" />
+              ) : (
+                <PanelLeftClose className="size-5" />
+              )}
+            </Button>
+            <Logo className="md:hidden" />
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <DeviceSwitcher />
             <WsBadge />
             <ThemeToggle />
             <UserMenu />
           </div>
         </header>
-        {/* `/chats` is a full-bleed master-detail surface (messenger layout)
-            so it deliberately skips the centered max-width column, padding,
-            and staggered entrance that every other page uses. The main padding
-            is also dropped for /chats only — otherwise the chats page overflows
-            the viewport by twice main's padding (1-1.5rem per side) on top of
-            the h-[calc(100svh-3.5rem)] height the inner wrapper already
-            accounts for. */}
-        <main className={location.pathname === '/chats' ? 'flex-1' : 'flex-1 p-4 md:p-6'}>
-          {location.pathname === '/chats' ? (
-            <div key={location.pathname} className="h-[calc(100svh-3.5rem)]">
-              <Outlet />
-            </div>
-          ) : (
-            <div key={location.pathname} className="stagger mx-auto flex max-w-5xl flex-col gap-5">
-              <Outlet />
-            </div>
-          )}
+        {/* Every page is a full-bleed surface that owns the viewport below
+            the top bar: `<main>` provides no padding and no centered column;
+            each page renders its own single bg-card rounded surface that
+            fills the height and handles its own internal padding/scroll.
+            `/chats` was the first page to use this layout; it is now global.
+            The `.stagger` entrance is preserved on the surface wrapper. */}
+        <main className="flex-1">
+          <div
+            key={location.pathname}
+            className="stagger h-[calc(100svh-3.5rem)] overflow-hidden p-3 md:p-4"
+          >
+            <Outlet />
+          </div>
         </main>
       </div>
       <PasskeyDialog />

@@ -5,6 +5,13 @@ interface SettingsStoreState {
   /** Media burst gap in minutes; used by the chat viewer to cluster incoming media. */
   mediaBurstGapMin: number
   setMediaBurstGapMin: (min: number) => void
+  /**
+   * Whether the desktop sidebar is collapsed to the icon rail. Ignored below
+   * `md` (mobile always uses the Sheet drawer). Persisted so the user's choice
+   * survives reloads across sessions.
+   */
+  sidebarCollapsed: boolean
+  setSidebarCollapsed: (collapsed: boolean) => void
 }
 
 /**
@@ -31,6 +38,8 @@ export const useSettingsStore = create<SettingsStoreState>()(
         if (floored < 1 || floored > 60) return
         set({ mediaBurstGapMin: floored })
       },
+      sidebarCollapsed: false,
+      setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
     }),
     {
       name: 'gowa-ui.settings.v1',

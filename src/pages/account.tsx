@@ -19,6 +19,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ActionCard } from '@/components/shared/action-card'
 import { PageHeader } from '@/components/shared/page-header'
+import { PageSurface } from '@/components/shared/page-surface'
 import { DeviceGuard, useSelectedDevice } from '@/hooks/use-device-guard'
 import { cn } from '@/lib/utils'
 import { RecipientBar } from '@/features/messaging/recipient-bar'
@@ -135,46 +136,55 @@ export default function AccountPage() {
   const device = useSelectedDevice()
 
   return (
-    <>
-      <PageHeader
-        title="Account"
-        description="Profile, privacy, contacts and lookups for the selected device."
-      />
-      {!device ? (
-        <DeviceGuard />
-      ) : (
-        <Tabs defaultValue="profile">
-          <TabsList>
-            <TabsTrigger value="profile">
-              <CircleUserRound className="size-4" />
-              My profile
-            </TabsTrigger>
-            <TabsTrigger value="lookup">
-              <ScanSearch className="size-4" />
-              Lookup
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="profile" className="flex max-w-2xl flex-col gap-4">
-            <MyProfileCard />
-            <ActionCard title="Change avatar" description="Update your own profile picture.">
-              <ChangeAvatarForm />
-            </ActionCard>
-            <ActionCard title="Change push name" description="Update your WhatsApp display name.">
-              <PushnameForm />
-            </ActionCard>
-            <ActionCard title="My privacy" description="Your current privacy settings.">
-              <PrivacyView />
-            </ActionCard>
-            <ActionCard title="My contacts" description="Contacts synced to this device.">
-              <ContactsView />
-            </ActionCard>
-          </TabsContent>
-          <TabsContent value="lookup" className="flex flex-col gap-4">
-            <RecipientBar showStatus={false} />
-            <LookupPanel />
-          </TabsContent>
-        </Tabs>
-      )}
-    </>
+    <PageSurface padded>
+      <div className="mx-auto flex max-w-5xl flex-col gap-5">
+        <PageHeader
+          title="Account"
+          description="Profile, privacy, contacts and lookups for the selected device."
+        />
+        {!device ? (
+          <DeviceGuard />
+        ) : (
+          <Tabs defaultValue="profile">
+            <TabsList>
+              <TabsTrigger value="profile">
+                <CircleUserRound className="size-4" />
+                My profile
+              </TabsTrigger>
+              <TabsTrigger value="lookup">
+                <ScanSearch className="size-4" />
+                Lookup
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="profile" className="flex flex-col gap-4">
+              {/* Identity banner — full-width so the avatar + push name anchor
+                  the surface; the action cards grid below pairs the related
+                  ones (avatar+pushname = display identity, privacy+contacts =
+                  account data) instead of stacking five cards vertically in a
+                  narrow column. */}
+              <MyProfileCard />
+              <div className="grid items-start gap-4 sm:grid-cols-2">
+                <ActionCard title="Change avatar" description="Update your own profile picture.">
+                  <ChangeAvatarForm />
+                </ActionCard>
+                <ActionCard title="Change push name" description="Update your WhatsApp display name.">
+                  <PushnameForm />
+                </ActionCard>
+                <ActionCard title="My privacy" description="Your current privacy settings.">
+                  <PrivacyView />
+                </ActionCard>
+                <ActionCard title="My contacts" description="Contacts synced to this device.">
+                  <ContactsView />
+                </ActionCard>
+              </div>
+            </TabsContent>
+            <TabsContent value="lookup" className="flex flex-col gap-4">
+              <RecipientBar showStatus={false} />
+              <LookupPanel />
+            </TabsContent>
+          </Tabs>
+        )}
+      </div>
+    </PageSurface>
   )
 }

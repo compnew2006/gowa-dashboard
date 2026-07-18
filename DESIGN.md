@@ -246,10 +246,11 @@ Every component leads with shape, then color assignment, then states. The whole 
 
 ### Navigation
 
-- **Sidebar:** `w-60`, Sidebar-tinted bg (one step lifted from body), `border-r`. Collapses into a left `Sheet` below `md`.
-- **Nav item:** `rounded-full` pill (the only pill outside badges), `px-3 py-2`, `text-sm font-medium`, Graphite inactive text. Hover: `bg-sidebar-accent/50`. Active: Twitter Blue-tinted accent bg + accent-foreground text.
-- **Nav group header:** `text-[11px] font-medium tracking-wider uppercase text-muted-foreground` — the reserved eyebrow treatment, one per group.
-- **Top bar:** `h-14`, `border-b`, holds mobile menu + logo (mobile), device switcher, WsBadge, theme toggle.
+- **Sidebar:** `w-60` expanded or `w-16` collapsed (icon rail), Sidebar-tinted bg (one step lifted from body), `border-r`. A toggle button in the top bar (`PanelLeftClose` / `PanelLeft`) flips between the two; the choice persists in `useSettingsStore.sidebarCollapsed`. The width animates (`transition-[width] duration-200 ease-in-out`). Below `md` the sidebar is hidden entirely and the shell uses a left `Sheet` drawer instead (the collapse flag is ignored on mobile).
+- **Collapsed rail:** group headers disappear; nav items center their icon (`justify-center px-0 py-2`); a thin `w-6` divider replaces the header between groups. Each collapsed item is wrapped in a right-side `Tooltip` carrying its label so the rail stays legible without text. The `Logo` renders icon-only (`iconOnly`) so the wordmark doesn't overflow the 64px rail.
+- **Nav item:** `rounded-full` pill (the only pill outside badges), `px-3 py-2` (expanded), `text-sm font-medium`, Graphite inactive text. Hover: `bg-sidebar-accent/50`. Active: Twitter Blue-tinted accent bg + accent-foreground text.
+- **Nav group header:** `text-[11px] font-medium tracking-wider uppercase text-muted-foreground` — the reserved eyebrow treatment, one per group. Only rendered when expanded.
+- **Top bar:** `h-14`, `border-b`, holds the mobile menu (`Menu`, `md:hidden`), the desktop collapse toggle (`PanelLeftClose`/`PanelLeft`, `hidden md:inline-flex`), and (mobile only) the logo, then device switcher, WsBadge, theme toggle.
 
 ### WsBadge (signature)
 

@@ -30,6 +30,7 @@ import { ChatControls } from '@/features/chat/chat-controls'
 import { MediaPreviewDialog } from '@/features/chat/media-preview-dialog'
 import { useMediaBurst } from '@/hooks/use-media-burst'
 import { useAppInfo } from '@/hooks/use-app-info'
+import { useChatScroll } from '@/hooks/use-chat-scroll'
 import { useSettingsStore } from '@/stores/settings'
 import { useUnreadStore } from '@/stores/unread'
 import { computeUnreadDelta } from '@/lib/unread-diff'
@@ -44,6 +45,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useActionMutation } from '@/hooks/use-action-mutation'
 import { formatDate, formatFileTimestamp } from '@/lib/format'
@@ -330,6 +332,7 @@ export function MessageView({
   // this single value, and the burst recomputes on every poll-driven `ordered`
   // change via the memo inside useMediaBurst.
   const mediaBurstGapMin = useSettingsStore((s) => s.mediaBurstGapMin)
+  const setMediaBurstGapMin = useSettingsStore((s) => s.setMediaBurstGapMin)
   const maxGapMs = mediaBurstGapMin * 60 * 1000
   const [burstOpen, setBurstOpen] = useState(false)
   // Feature 4 — compose-bar file attachment. `pendingFile` + `previewOpen`
@@ -404,6 +407,10 @@ export function MessageView({
     setUnreadDivider(null)
     useUnreadStore.getState().clear(deviceId, chat.jid)
   }, [chat.jid, deviceId])
+
+  // Reveal the polished scrollbar thumb only while scrolling the conversation.
+  // Re-binds on chat switch so the listener attaches to the fresh container.
+  useChatScroll(scrollRef, [chat.jid])
 
   // Feature 3 — feed the in-conversation unread divider. On each poll-driven
   // `data` change, when the tab is hidden OR the window lacks focus, diff the
@@ -688,25 +695,37 @@ export function MessageView({
             {chat.jid}
           </p>
         </div>
-        <div className="relative">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Download recent media"
-            disabled={burst.files.length === 0}
-            onClick={() => setBurstOpen(true)}
-          >
-            <Download className="size-5" />
-          </Button>
+        <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+          <Label htmlFor="media-burst-gap" className="sr-only">
+            Media burst gap (minutes)
+          </Label>
+          <Input
+            id="media-burst-gap"
+            type="number"
+            min={1}
+            max={60}
+            step={1}
+            aria-label="Media burst gap (minutes)"
+            className="h-8 w-16 tabular-nums"
+            value={mediaBurstGapMin}
+            onChange={(e) => setMediaBurstGapMin(e.target.valueAsNumber)}
+          />
+          <span aria-hidden="true">min gap</span>
+        </div>
+        <Button
+          variant="ghost"
+          aria-label="Download recent media"
+          disabled={burst.files.length === 0}
+          onClick={() => setBurstOpen(true)}
+          className="text-muted-foreground hover:bg-muted h-8 gap-1.5 px-2"
+        >
+          <Download className="size-4" />
           {burst.files.length > 0 && (
-            <span
-              aria-hidden="true"
-              className="bg-primary text-primary-foreground ring-background absolute -top-0.5 -right-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-medium tabular-nums ring-2"
-            >
+            <span className="bg-primary text-primary-foreground inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-medium tabular-nums">
               {burst.files.length}
             </span>
           )}
-        </div>
+        </Button>
         <ChatControls chat={chat} />
       </div>
 
@@ -732,7 +751,7 @@ export function MessageView({
 
       <div
         ref={scrollRef}
-        className="bg-muted/30 relative min-h-0 flex-1 overflow-y-auto p-4"
+        className="chat-scroll bg-muted/30 relative min-h-0 flex-1 overflow-y-auto p-4"
         onScroll={handleScroll}
       >
         {burst.files.length > 0 && (
