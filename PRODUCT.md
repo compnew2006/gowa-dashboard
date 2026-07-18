@@ -20,7 +20,7 @@ Success looks like: an operator can pair a device, see live WebSocket state, sen
 
 **Calm, precise, technical.** Three words that show up in every screen.
 
-- **Calm** — no shouting. Motion is purposeful and rare. The palette stays restrained: a single steel-blue primary carried from the gowa logo (`#7caec2`), tinted neutrals, and a single live green for connection state. No gradients, no hero metrics, no decorative chrome. The interface gets out of the way of the work.
+- **Calm** — no shouting. Motion is purposeful and rare. The palette stays restrained: a single vivid Twitter-blue primary (`oklch(0.6723 0.1606 245)` ≈ `#1d8cff` light / `#1dabff` dark), pure white and pure black surfaces, and a single live green for connection state. No gradients, no hero metrics, no decorative chrome. The interface gets out of the way of the work.
 - **Precise** — every label says what will happen. Buttons are verb + object ("Delete project", not "OK"). Statuses name their state ("Connected", "Reconnecting", "Offline") rather than gesturing. Densities are chosen, not defaulted. Numbers and IDs are monospaced where it helps scanning.
 - **Technical** — the user is an operator. We show device IDs, JIDs, WebSocket events, push names, webhook secrets, and TLS state plainly, in a typeface that respects them (Bricolage Grotesque for headings, Figtree for body, JetBrains Mono for code and identifiers). We never hide the system; we organize it.
 
@@ -28,7 +28,7 @@ Emotional goal: quiet confidence. The tool feels like something built by people 
 
 ## Anti-references
 
-- **Generic SaaS dashboards.** The indigo-to-violet gradient hero, the big-number-with-tiny-label metric strip, the identical icon-heading-text card grid, the "Trusted by" logo row, the three-tier pricing table — none of it. This is an operator's tool, not a marketing demo. Identity comes from the steel-blue brand and the technical content, not from a category template.
+- **Generic SaaS dashboards.** The indigo-to-violet gradient hero, the big-number-with-tiny-label metric strip, the identical icon-heading-text card grid, the "Trusted by" logo row, the three-tier pricing table — none of it. This is an operator's tool, not a marketing demo. Identity comes from the vivid Twitter-blue brand and the technical content, not from a category template.
 - As a consequence: no gradient text, no glassmorphism as default, no side-stripe accent borders, no per-section uppercase eyebrow kickers, no numbered `01 / 02 / 03` scaffolding. (These are listed in the skill's absolute bans and are not in play here.)
 
 ## Design Principles

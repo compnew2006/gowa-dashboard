@@ -5,7 +5,21 @@ export interface SendResult {
   status: string
 }
 
-export interface TextPayload {
+/**
+ * Optional per-request device scope (Feature 2). When set on a payload, the
+ * executor threads `X-Device-Id: <deviceId>` onto the axios call so a single
+ * conversation opened from the All-devices list targets its row's device
+ * without mutating the global `useDeviceStore`. The interceptor's
+ * `!config.headers['X-Device-Id']` guard lets this caller value win. The
+ * field is intentionally NOT part of the JSON/multipart body — it is a
+ * transport concern, and the `*Request` builders stay pure `ApiRequest`
+ * descriptions, so the cURL preview does not drift.
+ */
+export interface DeviceScoped {
+  deviceId?: string
+}
+
+export interface TextPayload extends DeviceScoped {
   phone: string
   message: string
   reply_message_id?: string
@@ -14,14 +28,19 @@ export interface TextPayload {
 }
 
 export function textRequest(payload: TextPayload): ApiRequest {
-  return { method: 'POST', path: '/send/message', json: clean(payload) }
+  // Strip the transport-only `deviceId` before building the request body —
+  // it must never reach the gowa send endpoint as a JSON field.
+  const { deviceId: _deviceId, ...body } = payload
+  return { method: 'POST', path: '/send/message', json: clean(body) }
 }
 
 export function sendText(payload: TextPayload): Promise<SendResult> {
-  return exec(textRequest(payload))
+  return exec(textRequest(payload), {
+    headers: payload.deviceId ? { 'X-Device-Id': encodeURIComponent(payload.deviceId) } : undefined,
+  })
 }
 
-export interface MediaPayload {
+export interface MediaPayload extends DeviceScoped {
   phone: string
   caption?: string
   file?: File
@@ -52,7 +71,9 @@ export function imageRequest(p: ImagePayload): ApiRequest {
 }
 
 export function sendImage(p: ImagePayload): Promise<SendResult> {
-  return exec(imageRequest(p))
+  return exec(imageRequest(p), {
+    headers: p.deviceId ? { 'X-Device-Id': encodeURIComponent(p.deviceId) } : undefined,
+  })
 }
 
 export function fileRequest(p: MediaPayload): ApiRequest {
@@ -72,7 +93,9 @@ export function fileRequest(p: MediaPayload): ApiRequest {
 }
 
 export function sendFile(p: MediaPayload): Promise<SendResult> {
-  return exec(fileRequest(p))
+  return exec(fileRequest(p), {
+    headers: p.deviceId ? { 'X-Device-Id': encodeURIComponent(p.deviceId) } : undefined,
+  })
 }
 
 export type VideoPayload = MediaPayload & {
@@ -101,7 +124,9 @@ export function videoRequest(p: VideoPayload): ApiRequest {
 }
 
 export function sendVideo(p: VideoPayload): Promise<SendResult> {
-  return exec(videoRequest(p))
+  return exec(videoRequest(p), {
+    headers: p.deviceId ? { 'X-Device-Id': encodeURIComponent(p.deviceId) } : undefined,
+  })
 }
 
 export function stickerRequest(p: MediaPayload): ApiRequest {
@@ -139,7 +164,9 @@ export function audioRequest(p: AudioPayload): ApiRequest {
 }
 
 export function sendAudio(p: AudioPayload): Promise<SendResult> {
-  return exec(audioRequest(p))
+  return exec(audioRequest(p), {
+    headers: p.deviceId ? { 'X-Device-Id': encodeURIComponent(p.deviceId) } : undefined,
+  })
 }
 
 export interface ContactPayload {

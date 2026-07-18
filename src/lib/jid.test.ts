@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { composeJid, isStatus } from './jid'
+import { composeJid, isStatus, jidToPhone } from './jid'
 
 describe('composeJid', () => {
   it('appends the user suffix', () => {
@@ -33,5 +33,39 @@ describe('isStatus', () => {
   it('is true only for status', () => {
     expect(isStatus('status')).toBe(true)
     expect(isStatus('user')).toBe(false)
+  })
+})
+
+describe('jidToPhone', () => {
+  it('returns the local part of an individual (user) jid', () => {
+    expect(jidToPhone('056183319@s.whatsapp.net')).toBe('056183319')
+  })
+
+  it('returns the local part of a group jid', () => {
+    expect(jidToPhone('1203630@g.us')).toBe('1203630')
+  })
+
+  it('returns the local part of a newsletter jid', () => {
+    expect(jidToPhone('abc@newsletter')).toBe('abc')
+  })
+
+  it('returns the local part of a LID jid', () => {
+    expect(jidToPhone('99@lid')).toBe('99')
+  })
+
+  it('returns "status" for the status broadcast jid', () => {
+    expect(jidToPhone('status@broadcast')).toBe('status')
+  })
+
+  it('returns the empty string for empty input', () => {
+    expect(jidToPhone('')).toBe('')
+  })
+
+  it('returns the empty string for whitespace-only input', () => {
+    expect(jidToPhone('   ')).toBe('')
+  })
+
+  it('returns the whole input when there is no @ (never throws)', () => {
+    expect(jidToPhone('no-at-sign')).toBe('no-at-sign')
   })
 })

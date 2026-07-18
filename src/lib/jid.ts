@@ -28,3 +28,16 @@ export function composeJid(phone: string, type: RecipientType): string {
 export function isStatus(type: RecipientType): boolean {
   return type === 'status'
 }
+
+/**
+ * Reduce a WhatsApp JID to its local-part phone/id. Returns the substring
+ * before the first `@`, the whole input when there is no `@`, and the empty
+ * string for empty/whitespace-only input. Never throws. This is the named,
+ * tested home for the `jid.split('@')[0]` idiom that several list components
+ * inline; it exists so the ZIP filename path has one place to call.
+ */
+export function jidToPhone(jid: string): string {
+  if (!jid || !jid.trim()) return ''
+  const atIndex = jid.indexOf('@')
+  return atIndex === -1 ? jid : jid.slice(0, atIndex)
+}

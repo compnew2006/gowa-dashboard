@@ -16,8 +16,17 @@ import { sameOriginBaseUrl } from '@/lib/url'
 import { useConnection } from '@/stores/connection'
 import { useDeviceStore } from '@/stores/device'
 
-/** Connection details the command needs, mirroring the axios interceptor. */
-function useCurlOptions(): Omit<CurlOptions, 'revealSecrets'> {
+/**
+ * Connection details the cURL renderer needs, mirroring the axios interceptor
+ * (base URL, basic auth, the global device id). Exported so the Feature 4
+ * media preview dialog can render a cURL preview of its matched multipart
+ * request without re-implementing the connection reads — the dialog builds its
+ * own small footer (a "cURL" outline button + CurlDialog) instead of the
+ * single-primary-button `<FormActions>`, because its primary is the
+ * caption-gated "Send file" submit, but it still stands on the same hook so
+ * the rendered command cannot drift from the live call.
+ */
+export function useCurlOptions(): Omit<CurlOptions, 'revealSecrets'> {
   const baseUrl = useConnection((state) => state.baseUrl)
   const username = useConnection((state) => state.username)
   const password = useConnection((state) => state.password)
@@ -25,7 +34,13 @@ function useCurlOptions(): Omit<CurlOptions, 'revealSecrets'> {
   return { baseUrl: baseUrl ?? sameOriginBaseUrl(), username, password, deviceId }
 }
 
-function CurlDialog({
+/**
+ * Exported so the Feature 4 media preview dialog can render the same cURL
+ * preview `FormActions` does, without being forced into FormActions'
+ * single-primary-button shape (the preview's primary is a caption-gated
+ * "Send file" submit, with a separate outline "cURL" button in the footer).
+ */
+export function CurlDialog({
   request,
   open,
   onOpenChange,

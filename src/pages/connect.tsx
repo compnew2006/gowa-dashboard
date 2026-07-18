@@ -61,7 +61,7 @@ export default function ConnectPage() {
         </CardHeader>
         <CardContent>
           <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
               <Label htmlFor="server-url">Server URL</Label>
               <Input
                 id="server-url"
@@ -72,7 +72,7 @@ export default function ConnectPage() {
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1.5">
                 <Label htmlFor="username">Username</Label>
                 <Input
                   id="username"
@@ -81,7 +81,7 @@ export default function ConnectPage() {
                   onChange={(event) => setUsername(event.target.value)}
                 />
               </div>
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1.5">
                 <Label htmlFor="password">Password</Label>
                 <Input
                   id="password"
@@ -103,7 +103,7 @@ export default function ConnectPage() {
                 The stored server was unreachable — check it and reconnect.
               </p>
             )}
-            <Button type="submit" disabled={submitting || !url.trim()}>
+            <Button type="submit" className="w-full" disabled={submitting || !url.trim()}>
               {submitting && <Loader2 className="size-4 animate-spin" />}
               Connect
             </Button>

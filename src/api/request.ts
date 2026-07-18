@@ -40,8 +40,21 @@ function toFormData(form: NonNullable<ApiRequest['form']>): FormData {
   return data
 }
 
+export interface ExecOptions {
+  /**
+   * Per-request header overrides merged onto the axios call AFTER the
+   * interceptor sets its defaults, so caller values win. Used by Feature 2
+   * to scope a single conversation to a non-global device via
+   * `X-Device-Id` without mutating `useDeviceStore` (the global switcher must
+   * not move when a cross-device row is opened). The interceptor's existing
+   * `if (deviceId && !config.headers['X-Device-Id'])` guard lets these
+   * caller-supplied headers pass through untouched.
+   */
+  headers?: Record<string, string>
+}
+
 /** Send a described request and unwrap the gowa envelope. */
-export function exec<T>(request: ApiRequest): Promise<T> {
+export function exec<T>(request: ApiRequest, opts?: ExecOptions): Promise<T> {
   const body = request.form ? toFormData(request.form) : request.json
-  return results<T>(http.post(request.path, body))
+  return results<T>(http.post(request.path, body, { headers: opts?.headers }))
 }

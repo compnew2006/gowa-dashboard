@@ -1,13 +1,40 @@
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type DragEvent as ReactDragEvent,
+  type FormEvent,
+} from 'react'
 import { keepPreviousData, useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Loader2, Reply, Send, SmilePlus, X } from 'lucide-react'
+import {
+  ArrowLeft,
+  Download,
+  FolderDown,
+  Loader2,
+  Paperclip,
+  Reply,
+  Send,
+  SmilePlus,
+  X,
+} from 'lucide-react'
+import { toast } from 'sonner'
 import { getChatMessages, type ChatInfo, type MessageInfo } from '@/api/chat'
 import { reactRequest } from '@/api/message'
 import { exec } from '@/api/request'
 import { sendText } from '@/api/send'
 import { ChatAvatar } from '@/features/chat/chat-avatar'
+import { MediaBurstDialog } from '@/features/chat/media-burst-dialog'
 import { MessageMedia } from '@/features/chat/message-media'
 import { ChatControls } from '@/features/chat/chat-controls'
+import { MediaPreviewDialog } from '@/features/chat/media-preview-dialog'
+import { useMediaBurst } from '@/hooks/use-media-burst'
+import { useAppInfo } from '@/hooks/use-app-info'
+import { useSettingsStore } from '@/stores/settings'
+import { useUnreadStore } from '@/stores/unread'
+import { computeUnreadDelta } from '@/lib/unread-diff'
+import { classifyMedia } from '@/lib/media-classify'
+import { MAX_MEDIA_BYTES, validateMediaFile } from '@/lib/media-validate'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -19,9 +46,11 @@ import {
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { useActionMutation } from '@/hooks/use-action-mutation'
-import { useSelectedDevice } from '@/hooks/use-device-guard'
-import { formatDate } from '@/lib/format'
+import { formatDate, formatFileTimestamp } from '@/lib/format'
+import { jidToPhone } from '@/lib/jid'
+import { tokenizeMessageText } from '@/lib/linkify'
 import { cn } from '@/lib/utils'
+import { buildChatZipName } from '@/lib/zip'
 
 const PAGE_SIZE = 50
 
@@ -33,6 +62,22 @@ const REACTION_SHORTLIST = ['👍', '❤️', '😂', '😮', '😢', '🙏']
 
 function dayKey(timestamp: string): string {
   return new Date(timestamp).toDateString()
+}
+
+/**
+ * The id of the most recent incoming (`!is_from_me`) message in `ordered` for
+ * the given chat, or null when there are none. Used by the unread-divider
+ * effect to seed and advance its "previously seen" cursor. `ordered` is
+ * chronological (oldest first, newest last), so the last incoming match wins.
+ */
+function topIncomingId(ordered: readonly MessageInfo[], chatJid: string): string | null {
+  for (let i = ordered.length - 1; i >= 0; i--) {
+    const message = ordered[i]
+    if (message.chat_jid !== chatJid) continue
+    if (message.is_from_me) continue
+    return message.id
+  }
+  return null
 }
 
 // Collapse repeated reactions into one pill per emoji with a count suffix.
@@ -49,14 +94,19 @@ function groupReactions(reactions: { emoji: string }[]): Map<string, number> {
 function MessageBubble({
   message,
   chatJid,
+  deviceId,
   onReply,
 }: {
   message: MessageInfo
   chatJid: string
+  // Feature 2: the conversation's scoping device id, threaded from
+  // MessageView's prop. Reaction invalidation keys on it so a reaction sent
+  // from an All-devices-scoped conversation refreshes that device's messages,
+  // not the global one.
+  deviceId: string
   onReply: (message: MessageInfo) => void
 }) {
   const queryClient = useQueryClient()
-  const deviceId = useSelectedDevice()
   const hasMedia = message.media_type && message.media_type !== ''
   const [customEmoji, setCustomEmoji] = useState('')
 
@@ -84,35 +134,62 @@ function MessageBubble({
   return (
     <div
       className={cn(
-        'group flex items-center gap-1',
+        'group flex items-start gap-1',
         message.is_from_me ? 'justify-end' : 'justify-start',
       )}
     >
       <div
         className={cn(
-          'max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-xs',
-          message.is_from_me ? 'bg-bubble-out rounded-br-sm' : 'bg-bubble-in rounded-bl-sm border',
+          'max-w-[75%] rounded-[1.25rem] px-3.5 py-2 text-sm ring-1 transition-colors',
+          message.is_from_me
+            ? 'bg-bubble-out text-foreground ring-bubble-out/40 rounded-br-md'
+            : 'bg-bubble-in text-foreground ring-border rounded-bl-md',
         )}
       >
         {!message.is_from_me && (
-          <p className="text-muted-foreground mb-0.5 font-mono text-xs">{message.sender_jid}</p>
+          <p className="text-muted-foreground mb-1 font-mono text-xs">{message.sender_jid}</p>
         )}
-        {message.content && <p className="break-words whitespace-pre-wrap">{message.content}</p>}
+        {message.content && (
+          <p className="leading-relaxed break-words whitespace-pre-wrap">
+            {tokenizeMessageText(message.content).map((token, index) =>
+              token.kind === 'link' ? (
+                <a
+                  key={index}
+                  href={token.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:text-primary/80 underline underline-offset-2 transition-colors"
+                >
+                  {token.value}
+                </a>
+              ) : (
+                token.value || null
+              ),
+            )}
+          </p>
+        )}
         {hasMedia && <MessageMedia message={message} />}
         {reactionCounts && reactionCounts.size > 0 && (
-          <div className="mt-1 flex flex-wrap gap-1">
+          <div className="mt-1.5 flex flex-wrap gap-1">
             {Array.from(reactionCounts, ([emoji, count]) => (
               <span
                 key={emoji}
-                className="bg-background/70 inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-xs"
+                className="bg-background border-border inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs shadow-xs transition-transform hover:scale-110"
               >
                 {emoji}
-                {count > 1 ? ` ${count}` : ''}
+                {count > 1 ? (
+                  <span className="text-muted-foreground tabular-nums">{count}</span>
+                ) : null}
               </span>
             ))}
           </div>
         )}
-        <p className="text-muted-foreground mt-1 text-right text-xs">
+        <p
+          className={cn(
+            'mt-1 text-right text-[0.6875rem] tabular-nums',
+            message.is_from_me ? 'text-primary/70' : 'text-muted-foreground',
+          )}
+        >
           {formatDate(message.timestamp)}
         </p>
       </div>
@@ -134,21 +211,24 @@ function MessageBubble({
               <SmilePlus className="size-3.5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align={message.is_from_me ? 'end' : 'start'}>
-            <div className="flex flex-wrap gap-1 p-1">
+          <DropdownMenuContent
+            align={message.is_from_me ? 'end' : 'start'}
+            className="min-w-[15rem] gap-1 p-1.5"
+          >
+            <div className="grid grid-cols-6 gap-0.5">
               {REACTION_SHORTLIST.map((emoji) => (
                 <DropdownMenuItem
                   key={emoji}
-                  className="justify-center text-base"
+                  className="data-[highlighted]:bg-accent justify-center rounded-md text-xl"
                   onSelect={() => sendReaction(emoji)}
                 >
                   {emoji}
                 </DropdownMenuItem>
               ))}
             </div>
-            <DropdownMenuSeparator />
+            <DropdownMenuSeparator className="my-1" />
             <form
-              className="flex items-center gap-1 p-1"
+              className="flex items-center gap-1.5 px-1 py-0.5"
               onSubmit={(event) => {
                 event.preventDefault()
                 const trimmed = customEmoji.trim()
@@ -160,17 +240,17 @@ function MessageBubble({
             >
               <Input
                 value={customEmoji}
-                className="h-8 text-sm"
-                placeholder="Emoji"
+                className="bg-muted/40 focus-visible:bg-background h-8 border-0 text-sm focus-visible:ring-1"
+                placeholder="Custom emoji"
                 onChange={(event) => setCustomEmoji(event.target.value)}
               />
               <Button type="submit" size="sm" disabled={!customEmoji.trim()}>
                 Send
               </Button>
             </form>
-            <DropdownMenuSeparator />
+            <DropdownMenuSeparator className="my-1" />
             <DropdownMenuItem variant="destructive" onSelect={() => sendReaction('')}>
-              Remove
+              Remove reaction
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -188,7 +268,26 @@ function MessageBubble({
   )
 }
 
-export function MessageView({ chat, onBack }: { chat: ChatInfo; onBack?: () => void }) {
+export function MessageView({
+  chat,
+  deviceId,
+  onBack,
+}: {
+  chat: ChatInfo
+  /**
+   * Feature 2: the device this conversation is scoped to. In This-device mode
+   * this is `useDeviceStore.selectedDeviceId`; in All-devices mode it is the
+   * merged row's owning device id, captured in `conversationDeviceId` state in
+   * `pages/chats.tsx`. The chat viewer owns its scoping now — the global
+   * device switcher in the top bar is untouched when an All-devices row is
+   * opened. Threads into `getChatMessages` (per-request X-Device-Id header
+   * override), `sendText` (same header), and the react invalidation key so a
+   * cross-device conversation reads from, writes to, and invalidates only its
+   * own device's query cache.
+   */
+  deviceId: string
+  onBack?: () => void
+}) {
   const queryClient = useQueryClient()
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
@@ -206,22 +305,65 @@ export function MessageView({ chat, onBack }: { chat: ChatInfo; onBack?: () => v
   // the moment fetchNextPage fires; re-armed only when the user actively
   // scrolls down past the top zone (see handleScroll).
   const observerArmedRef = useRef(true)
-  const deviceId = useSelectedDevice()
+  // Feature 3 — in-conversation unread divider. These refs and state are
+  // DELIBERATELY separate from the four auto-scroll concerns above
+  // (stickToBottomRef / isNearBottomRef / observerArmedRef / anchorIdRef).
+  // The divider reads the same `data` but never touches the scroll-restore
+  // refs, so adding it cannot disturb the load-older anchor or the
+  // stick-to-bottom jump.
+  // `prevTopIncomingIdRef` is the cursor the divider effect diffs against; it
+  // does not need to trigger renders, so a ref is correct.
+  const prevTopIncomingIdRef = useRef<string | null>(null)
+  // `unreadDivider` is the {anchor id, count} the render loop reads, or null
+  // when no divider is showing. State (not a ref) so updating it re-renders.
+  const [unreadDivider, setUnreadDivider] = useState<{
+    anchorId: string
+    count: number
+  } | null>(null)
   const [search, setSearch] = useState('')
   const [mediaOnly, setMediaOnly] = useState(false)
   const [draft, setDraft] = useState('')
   const [replyTarget, setReplyTarget] = useState<MessageInfo | null>(null)
+  // Burst gap (the configurable "files arriving close together" window) lives
+  // in the persisted settings store so the operator can tune it from Settings
+  // and have it survive a reload. The chip + dialog + burst all derive from
+  // this single value, and the burst recomputes on every poll-driven `ordered`
+  // change via the memo inside useMediaBurst.
+  const mediaBurstGapMin = useSettingsStore((s) => s.mediaBurstGapMin)
+  const maxGapMs = mediaBurstGapMin * 60 * 1000
+  const [burstOpen, setBurstOpen] = useState(false)
+  // Feature 4 — compose-bar file attachment. `pendingFile` + `previewOpen`
+  // drive the MediaPreviewDialog; `fileInputRef` points at the hidden
+  // <input type="file"> the paperclip button click()es open; `dragActive`
+  // toggles the state-encoding ring on the compose form during a drag. These
+  // are deliberately separate from the four auto-scroll refs above and the F3
+  // divider refs — the attachment flow never touches scroll-restore or
+  // unread-divider state.
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [dragActive, setDragActive] = useState(false)
+  // Per-type size ceilings from the backend (AppInfo), used by the validator
+  // before the preview opens. Falls back to MAX_MEDIA_BYTES (16 MiB) when
+  // AppInfo has not loaded yet or reports zero — the validator's contract is
+  // "pure function of (file, limits)" so the hook just feeds it the right
+  // ceiling per kind.
+  const { data: appInfo } = useAppInfo()
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery({
     queryKey: ['chat-messages', deviceId, chat.jid, { search, mediaOnly }],
     initialPageParam: 0,
     queryFn: ({ pageParam }) =>
-      getChatMessages(chat.jid, {
-        search: search || undefined,
-        media_only: mediaOnly || undefined,
-        limit: PAGE_SIZE,
-        offset: pageParam,
-      }),
+      getChatMessages(
+        chat.jid,
+        {
+          search: search || undefined,
+          media_only: mediaOnly || undefined,
+          limit: PAGE_SIZE,
+          offset: pageParam,
+        },
+        deviceId,
+      ),
     getNextPageParam: (lastPage) =>
       lastPage.pagination.offset + lastPage.data.length < lastPage.pagination.total
         ? lastPage.pagination.offset + lastPage.data.length
@@ -245,14 +387,96 @@ export function MessageView({ chat, onBack }: { chat: ChatInfo; onBack?: () => v
   // invariant: render maps over `ordered`; day-separator reads `ordered[index-1]`.
   const messages = data?.pages.flatMap((p) => p.data) ?? []
   const ordered = [...messages].reverse()
+  // Burst is computed from `ordered` (not the un-reversed `messages`) so the
+  // clustered list in the dialog reads top-to-bottom in chronological order.
+  const burst = useMediaBurst(ordered, maxGapMs)
 
   // New chat → arm stick-to-bottom so the first paint jumps to the newest, and
   // re-arm the load-older observer so the user CAN scroll up to fetch history
-  // in the new chat (the flag must not stay disarmed from a prior chat).
+  // in the new chat (the flag must not stay disarmed from a prior chat). Also
+  // clears this chat's unread badge in the store (Feature 3): opening a
+  // conversation is the read event, and resets the divider cursor so a stale
+  // anchor from the previously-open chat does not leak in.
   useEffect(() => {
     stickToBottomRef.current = true
     observerArmedRef.current = true
-  }, [chat.jid])
+    prevTopIncomingIdRef.current = null
+    setUnreadDivider(null)
+    useUnreadStore.getState().clear(deviceId, chat.jid)
+  }, [chat.jid, deviceId])
+
+  // Feature 3 — feed the in-conversation unread divider. On each poll-driven
+  // `data` change, when the tab is hidden OR the window lacks focus, diff the
+  // incoming messages against the previously-seen top incoming id and grow the
+  // divider count by the delta. The anchor is set once on the 0 → non-zero
+  // transition so it marks the FIRST message that arrived while away (the
+  // divider sits above that bubble in the render loop). This effect reads the
+  // same `data` as the auto-scroll effects but touches NONE of their refs —
+  // the two concerns are fully independent.
+  //
+  // `refetchIntervalInBackground` defaults to false in TanStack v5, so the
+  // query pauses when the tab is hidden; the real driver is the window-blur
+  // case (polling continues while the tab is visible but unfocused). When the
+  // user returns, the visibility/focus listener below clears the divider and
+  // scrolls the anchor into view.
+  useEffect(() => {
+    if (isLoading) return
+    const away = document.visibilityState !== 'visible' || !document.hasFocus()
+    if (!away) {
+      // Refresh the cursor while present so the next away-window diff starts
+      // from the most recent incoming id we have actually shown the user.
+      prevTopIncomingIdRef.current = topIncomingId(ordered, chat.jid)
+      return
+    }
+    const result = computeUnreadDelta(
+      prevTopIncomingIdRef.current,
+      ordered,
+      chat.jid,
+      // isSelected is always true here — this conversation IS open — but the
+      // divider's away-window logic is independent of the badge suppression,
+      // so we pass false to let the delta through and gate it on `away` above.
+      false,
+    )
+    if (result.delta > 0) {
+      setUnreadDivider((prev) => {
+        const nextCount = (prev?.count ?? 0) + result.delta
+        const anchorId = prev?.anchorId ?? result.firstNewIncomingId ?? ''
+        return anchorId === '' ? null : { anchorId, count: nextCount }
+      })
+    }
+    // Advance the cursor so the next poll only counts messages newer than this
+    // one (the anchor is stable; the count grows).
+    prevTopIncomingIdRef.current = topIncomingId(ordered, chat.jid) ?? prevTopIncomingIdRef.current
+  }, [data, ordered, chat.jid, isLoading])
+
+  // Feature 3 — clear the divider and scroll the anchor into view when the
+  // user returns. Registered once on mount (no deps) so the listeners are
+  // stable; it reads `unreadDivider` through a ref mirror so the handler
+  // always sees the latest value without re-registering on every count change.
+  const unreadDividerRef = useRef(unreadDivider)
+  unreadDividerRef.current = unreadDivider
+  useEffect(() => {
+    const onReturn = () => {
+      const current = unreadDividerRef.current
+      // Only act when the tab is visible AND focused — intermediate
+      // visibilitychange fires (e.g. screen lock) without a real return.
+      if (document.visibilityState !== 'visible' || !document.hasFocus()) return
+      if (!current) return
+      const anchorEl = scrollRef.current?.querySelector<HTMLElement>(
+        `[data-msg-id="${CSS.escape(current.anchorId)}"]`,
+      )
+      setUnreadDivider(null)
+      if (anchorEl && scrollRef.current) {
+        scrollRef.current.scrollTop = anchorEl.offsetTop - scrollRef.current.clientTop
+      }
+    }
+    document.addEventListener('visibilitychange', onReturn)
+    window.addEventListener('focus', onReturn)
+    return () => {
+      document.removeEventListener('visibilitychange', onReturn)
+      window.removeEventListener('focus', onReturn)
+    }
+  }, [])
 
   // Stick-to-bottom jump. useLayoutEffect (not useEffect) so it runs after DOM
   // mutations but BEFORE the browser paints — when TanStack hands back cached
@@ -353,7 +577,14 @@ export function MessageView({ chat, onBack }: { chat: ChatInfo; onBack?: () => v
 
   const sendMutation = useActionMutation(
     (message: string) =>
-      sendText({ phone: chat.jid, message, reply_message_id: replyTarget?.id || undefined }),
+      sendText({
+        phone: chat.jid,
+        message,
+        reply_message_id: replyTarget?.id || undefined,
+        // Scope the send to this conversation's device — an All-devices-scoped
+        // conversation must reply on its row's device, not the global one.
+        deviceId,
+      }),
     {
       successMessage: 'Message sent',
       onSuccess: () => {
@@ -372,9 +603,73 @@ export function MessageView({ chat, onBack }: { chat: ChatInfo; onBack?: () => v
     if (draft.trim()) sendMutation.mutate(draft.trim())
   }
 
+  // Feature 4 — pick a file (from the paperclip button or a drag-and-drop),
+  // validate it, and open the preview. Validation failures fire `toast.error`
+  // directly (verb+object copy from the validator's `reason`) and never open
+  // the dialog — they are not mutation results, so they bypass
+  // useActionMutation. On success, the file lands in `pendingFile` and the
+  // preview opens; the dialog's own onSent arms the auto-scroll + clears the
+  // reply target + invalidates (see onFileSent below). The per-kind size
+  // ceiling is picked from AppInfo when available, falling back to the
+  // 16 MiB constant; a zero AppInfo value is treated as "unset" and also
+  // falls back, because gowa reports 0 on misconfiguration.
+  const maxBytesFor = (file: File): number => {
+    const kind = classifyMedia(file)
+    if (appInfo) {
+      if (kind === 'image' && appInfo.max_image_size > 0) return appInfo.max_image_size
+      if (kind === 'video' && appInfo.max_video_size > 0) return appInfo.max_video_size
+      if (appInfo.max_file_size > 0) return appInfo.max_file_size
+    }
+    return MAX_MEDIA_BYTES
+  }
+
+  const handlePicked = (file?: File | null) => {
+    if (!file) return
+    const result = validateMediaFile(file, { maxBytes: maxBytesFor(file) })
+    if (!result.ok) {
+      toast.error(result.reason)
+      return
+    }
+    setPendingFile(file)
+    setPreviewOpen(true)
+  }
+
+  // After the preview's send succeeds, mirror the text sendMutation's
+  // onSuccess: arm stick-to-bottom so the just-sent bubble scrolls into
+  // view on the invalidation refetch, clear the reply target, and invalidate
+  // the device-scoped message query. Closing the preview here is intentional
+  // — the operator has committed the send, the dialog has done its job.
+  const onFileSent = () => {
+    stickToBottomRef.current = true
+    setReplyTarget(null)
+    setPreviewOpen(false)
+    setPendingFile(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    void queryClient.invalidateQueries({ queryKey: ['chat-messages', deviceId, chat.jid] })
+  }
+
+  // Drag-and-drop onto the compose form. preventDefault on dragover is what
+  // allows the subsequent drop event to fire (browsers otherwise swallow it);
+  // the dragActive ring is the single visual change, applied via a state ring
+  // per the impeccable product-register (no overlay card, no glassmorphism).
+  const onDragOver = (event: ReactDragEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!dragActive) setDragActive(true)
+  }
+  const onDragLeave = (event: ReactDragEvent<HTMLFormElement>) => {
+    // Only clear when leaving the form itself, not when crossing into a child
+    // (the input, the paperclip). The relatedTarget check avoids flicker.
+    if (event.currentTarget === event.target) setDragActive(false)
+  }
+  const onDrop = (event: ReactDragEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setDragActive(false)
+    handlePicked(event.dataTransfer.files[0])
+  }
+
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 border-b px-3 py-2.5">
+      <div className="flex items-center gap-2.5 border-b px-4 py-3">
         {onBack && (
           <Button
             variant="ghost"
@@ -388,13 +683,34 @@ export function MessageView({ chat, onBack }: { chat: ChatInfo; onBack?: () => v
         )}
         <ChatAvatar name={chat.name || chat.jid} size="sm" />
         <div className="flex min-w-0 flex-1 flex-col">
-          <h2 className="truncate text-sm font-semibold">{chat.name || chat.jid}</h2>
-          <p className="text-muted-foreground truncate font-mono text-xs">{chat.jid}</p>
+          <h2 className="truncate text-sm leading-tight font-semibold">{chat.name || chat.jid}</h2>
+          <p className="text-muted-foreground truncate font-mono text-xs leading-tight">
+            {chat.jid}
+          </p>
+        </div>
+        <div className="relative">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Download recent media"
+            disabled={burst.files.length === 0}
+            onClick={() => setBurstOpen(true)}
+          >
+            <Download className="size-5" />
+          </Button>
+          {burst.files.length > 0 && (
+            <span
+              aria-hidden="true"
+              className="bg-primary text-primary-foreground ring-background absolute -top-0.5 -right-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-medium tabular-nums ring-2"
+            >
+              {burst.files.length}
+            </span>
+          )}
         </div>
         <ChatControls chat={chat} />
       </div>
 
-      <div className="flex flex-col gap-2 border-b px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2.5 border-b px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between">
         <Input
           className="bg-muted/40 focus-visible:bg-background border-0 focus-visible:ring-1 sm:max-w-xs"
           placeholder="Search messages"
@@ -403,7 +719,7 @@ export function MessageView({ chat, onBack }: { chat: ChatInfo; onBack?: () => v
             setSearch(event.target.value)
           }}
         />
-        <label className="text-muted-foreground flex items-center gap-2 text-xs">
+        <label className="text-muted-foreground flex items-center gap-2 text-xs font-medium">
           <Switch
             checked={mediaOnly}
             onCheckedChange={(value) => {
@@ -416,9 +732,24 @@ export function MessageView({ chat, onBack }: { chat: ChatInfo; onBack?: () => v
 
       <div
         ref={scrollRef}
-        className="bg-muted/30 min-h-0 flex-1 overflow-y-auto p-4"
+        className="bg-muted/30 relative min-h-0 flex-1 overflow-y-auto p-4"
         onScroll={handleScroll}
       >
+        {burst.files.length > 0 && (
+          <Button
+            variant="secondary"
+            size="sm"
+            aria-label="Download recent media"
+            className={cn(
+              'absolute top-2 left-1/2 z-10 -translate-x-1/2 shadow-xs',
+              burst.isCollectible && 'ring-primary/30 ring-1 motion-safe:animate-pulse',
+            )}
+            onClick={() => setBurstOpen(true)}
+          >
+            <FolderDown className="size-3.5" />
+            {`${burst.files.length} file${burst.files.length === 1 ? '' : 's'} just in`}
+          </Button>
+        )}
         {isLoading ? (
           <div className="flex justify-center p-6">
             <Loader2 className="text-muted-foreground size-5 animate-spin" />
@@ -449,11 +780,12 @@ export function MessageView({ chat, onBack }: { chat: ChatInfo; onBack?: () => v
               {ordered.map((message, index) => {
                 const showDateSeparator =
                   index === 0 || dayKey(message.timestamp) !== dayKey(ordered[index - 1].timestamp)
+                const showUnreadDivider = unreadDivider?.anchorId === message.id
                 return (
                   <div key={message.id} data-msg-id={message.id}>
                     {showDateSeparator && (
-                      <div className="flex justify-center py-1">
-                        <span className="bg-card text-muted-foreground rounded-full border px-3 py-0.5 text-xs shadow-xs">
+                      <div className="flex justify-center py-2">
+                        <span className="text-muted-foreground bg-muted/60 rounded-full px-3 py-1 text-[0.6875rem] font-medium tabular-nums">
                           {new Date(message.timestamp).toLocaleDateString(undefined, {
                             day: 'numeric',
                             month: 'short',
@@ -462,7 +794,23 @@ export function MessageView({ chat, onBack }: { chat: ChatInfo; onBack?: () => v
                         </span>
                       </div>
                     )}
-                    <MessageBubble message={message} chatJid={chat.jid} onReply={setReplyTarget} />
+                    {showUnreadDivider && unreadDivider && (
+                      <div
+                        role="separator"
+                        aria-label={`${unreadDivider.count} unread message${unreadDivider.count === 1 ? '' : 's'}`}
+                        className="motion-safe:animate-in motion-safe:fade-in flex justify-center py-2 motion-safe:duration-200"
+                      >
+                        <span className="bg-card text-muted-foreground rounded-full border px-3 py-0.5 text-xs shadow-xs">
+                          {`${unreadDivider.count} unread message${unreadDivider.count === 1 ? '' : 's'}`}
+                        </span>
+                      </div>
+                    )}
+                    <MessageBubble
+                      message={message}
+                      chatJid={chat.jid}
+                      deviceId={deviceId}
+                      onReply={setReplyTarget}
+                    />
                   </div>
                 )
               })}
@@ -472,8 +820,8 @@ export function MessageView({ chat, onBack }: { chat: ChatInfo; onBack?: () => v
       </div>
 
       {replyTarget && (
-        <div className="bg-muted/40 border-primary flex items-center gap-2 border-l-2 px-3 py-2 text-sm">
-          <Reply className="text-muted-foreground size-4 shrink-0" />
+        <div className="bg-muted/50 border-primary/60 flex items-center gap-2.5 border-l-2 px-3.5 py-2 text-sm">
+          <Reply className="text-primary size-4 shrink-0" />
           <div className="min-w-0 flex-1">
             <p className="text-muted-foreground truncate font-mono text-xs">
               {replyTarget.sender_jid}
@@ -484,8 +832,8 @@ export function MessageView({ chat, onBack }: { chat: ChatInfo; onBack?: () => v
           </div>
           <Button
             variant="ghost"
-            size="icon"
-            className="text-muted-foreground size-6 shrink-0"
+            size="icon-sm"
+            className="text-muted-foreground shrink-0"
             aria-label="Cancel reply"
             onClick={() => setReplyTarget(null)}
           >
@@ -494,22 +842,86 @@ export function MessageView({ chat, onBack }: { chat: ChatInfo; onBack?: () => v
         </div>
       )}
 
-      <form className="flex items-center gap-2 border-t px-3 py-2.5" onSubmit={onSend}>
+      <form
+        className={cn(
+          'flex items-center gap-2 border-t px-3 py-2.5 transition-shadow',
+          dragActive && 'ring-primary/40 ring-1',
+        )}
+        onSubmit={onSend}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+      >
+        {/* Hidden file input with NO `accept` restriction — the validator
+            handles type rejection (an empty/unknown MIME falls through to
+            /send/file, which is the correct destination for WhatsApp document
+            types like .docx that browsers do not always have a MIME mapping
+            for). The paperclip button click()es it open. Value is reset on
+            send and on cancel so picking the same file twice re-fires
+            onChange (a stable value would otherwise swallow the second pick). */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={(event) => {
+            handlePicked(event.target.files?.[0])
+            // Reset immediately so a follow-up pick of the SAME file fires
+            // onChange again (the OS picker otherwise no-ops). If validation
+            // failed the preview never opened, and if it succeeded the file is
+            // already captured in pendingFile — either way the input is free.
+            event.target.value = ''
+          }}
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="Attach file"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Paperclip className="size-5" />
+        </Button>
         <Input
-          className="flex-1"
+          className="bg-muted/40 focus-visible:bg-background flex-1 rounded-[1.25rem] border-0 px-4 focus-visible:ring-1"
           placeholder="Type a message"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
         />
-        <Button type="submit" disabled={sendMutation.isPending || !draft.trim()}>
+        <Button
+          type="submit"
+          size="icon-lg"
+          className="rounded-full"
+          aria-label="Send message"
+          disabled={sendMutation.isPending || !draft.trim()}
+        >
           {sendMutation.isPending ? (
             <Loader2 className="size-4 animate-spin" />
           ) : (
             <Send className="size-4" />
           )}
-          Send
         </Button>
       </form>
+
+      <MediaBurstDialog
+        messages={burst.files}
+        maxGapLabel={`${mediaBurstGapMin} min`}
+        open={burstOpen}
+        onOpenChange={setBurstOpen}
+        zipName={buildChatZipName({
+          identifier: chat.name || jidToPhone(chat.jid),
+          timestamp: formatFileTimestamp(),
+        })}
+      />
+
+      <MediaPreviewDialog
+        file={pendingFile}
+        chatJid={chat.jid}
+        deviceId={deviceId}
+        replyTarget={replyTarget}
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        onSent={onFileSent}
+      />
     </div>
   )
 }

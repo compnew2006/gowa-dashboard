@@ -56,13 +56,31 @@ export interface ChatMessagesParams {
 
 const enc = encodeURIComponent
 
-export function listChats(params: ListChatsParams) {
-  return results<{ data: ChatInfo[]; pagination: Pagination }>(http.get('/chats', { params }))
+export function listChats(params: ListChatsParams, deviceId?: string) {
+  // Feature 2: in All-devices mode, each per-device query must read ITS OWN
+  // device's chats, not the globally-selected device's. When `deviceId` is set
+  // it wins over the axios interceptor's default (the interceptor's
+  // `!config.headers['X-Device-Id']` guard lets caller headers through). When
+  // unset, the request is byte-identical to the single-device path.
+  return results<{ data: ChatInfo[]; pagination: Pagination }>(
+    http.get('/chats', {
+      params,
+      headers: deviceId ? { 'X-Device-Id': enc(deviceId) } : undefined,
+    }),
+  )
 }
 
-export function getChatMessages(chatJid: string, params: ChatMessagesParams) {
+export function getChatMessages(chatJid: string, params: ChatMessagesParams, deviceId?: string) {
+  // Feature 2: scope a single conversation's reads to a non-global device.
+  // `deviceId` is the row's device id in All-devices mode; when unset, the
+  // axios interceptor attaches the global `useDeviceStore` device id and the
+  // request is byte-identical to today. The `!config.headers['X-Device-Id']`
+  // guard in `lib/http.ts` lets this caller-supplied header win.
   return results<{ data: MessageInfo[]; pagination: Pagination; chat_info: ChatInfo }>(
-    http.get(`/chat/${enc(chatJid)}/messages`, { params }),
+    http.get(`/chat/${enc(chatJid)}/messages`, {
+      params,
+      headers: deviceId ? { 'X-Device-Id': enc(deviceId) } : undefined,
+    }),
   )
 }
 
