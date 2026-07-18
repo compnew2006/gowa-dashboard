@@ -64,7 +64,8 @@ function App() {
     <Routes>
       <Route path="/connect" element={<ConnectPage />} />
       <Route element={<AppShell />}>
-        <Route path="/" element={<DashboardPage />} />
+        <Route path="/" element={<Navigate to="/chats" replace />} />
+        <Route path="/devices" element={<DashboardPage />} />
         <Route path="/messaging" element={<MessagingPage />} />
         <Route path="/send" element={<Navigate to="/messaging" replace />} />
         <Route path="/messages" element={<Navigate to="/messaging" replace />} />

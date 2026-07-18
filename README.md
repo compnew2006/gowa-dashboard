@@ -78,5 +78,7 @@ Every `v*` tag publishes exactly one asset named **`gowa-ui.html`** (plus a `.sh
 - [x] **M7** — parity audit vs the embedded dashboard → v1.0.0
 - [x] **v1.1.0** — per-device webhook editor (URL, secret, events, TLS verify) on the device card
 - [x] **v1.1.1** — group participants viewer: table with admin badges + inline add/promote/demote/remove
+- [x] **chat viewer overhaul** — `/chats` is now a full-bleed master-detail messenger (no centered column): responsive two-pane layout with mobile push navigation, deterministic colored avatars, grouped emoji reaction pills, and **infinite scroll** on both the chat list and the message view (50 per page, loads more at ~80% scroll, scroll-anchored so older messages stream in without yanking the viewport). The shell theme toggle collapsed to a single light/dark flip; the full Light/Dark/System picker stays on Settings.
+- [x] **live chat polling** — the chat list and message view refetch every 5s (TanStack `refetchInterval`, pauses when the tab is hidden), so incoming messages appear without a manual refresh.
 
 Still to do: Chatwoot config module, full WebAuthn passkey flow.

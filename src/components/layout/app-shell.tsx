@@ -14,6 +14,7 @@ import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { DeviceSwitcher } from '@/components/layout/device-switcher'
 import { Logo } from '@/components/layout/logo'
 import { ThemeToggle } from '@/components/layout/theme-toggle'
+import { UserMenu } from '@/components/layout/user-menu'
 import { WsBadge } from '@/components/layout/ws-badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -25,7 +26,7 @@ import { useConnection } from '@/stores/connection'
 const navGroups = [
   {
     label: 'Overview',
-    items: [{ to: '/', label: 'Devices', icon: LayoutDashboard }],
+    items: [{ to: '/devices', label: 'Devices', icon: LayoutDashboard }],
   },
   {
     label: 'Messaging',
@@ -143,12 +144,26 @@ export function AppShell() {
             <DeviceSwitcher />
             <WsBadge />
             <ThemeToggle />
+            <UserMenu />
           </div>
         </header>
-        <main className="flex-1 p-4 md:p-6">
-          <div key={location.pathname} className="stagger mx-auto flex max-w-5xl flex-col gap-5">
-            <Outlet />
-          </div>
+        {/* `/chats` is a full-bleed master-detail surface (messenger layout)
+            so it deliberately skips the centered max-width column, padding,
+            and staggered entrance that every other page uses. The main padding
+            is also dropped for /chats only — otherwise the chats page overflows
+            the viewport by twice main's padding (1-1.5rem per side) on top of
+            the h-[calc(100svh-3.5rem)] height the inner wrapper already
+            accounts for. */}
+        <main className={location.pathname === '/chats' ? 'flex-1' : 'flex-1 p-4 md:p-6'}>
+          {location.pathname === '/chats' ? (
+            <div key={location.pathname} className="h-[calc(100svh-3.5rem)]">
+              <Outlet />
+            </div>
+          ) : (
+            <div key={location.pathname} className="stagger mx-auto flex max-w-5xl flex-col gap-5">
+              <Outlet />
+            </div>
+          )}
         </main>
       </div>
       <PasskeyDialog />

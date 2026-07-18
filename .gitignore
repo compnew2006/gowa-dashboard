@@ -14,7 +14,7 @@ dist-ssr
 .impeccable
 .playwright-mcp
 specs/
-
+.zcode
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -246,6 +246,18 @@ The semantic-status pattern used across device cards, session dialogs, and anywh
 ### DeviceCard (signature)
 The primary unit of the dashboard. Avatar + push name (mono ID) + StateBadge + a `...` menu of mutations (login QR, login code, reconnect, logout, webhook, delete). Selecting it scopes the whole app to that device. Delete is gated behind an `AlertDialog`. Embodies the "one surface, every device" principle from PRODUCT.md.
 
+### ThemeToggle
+A single ghost icon button in the top bar that flips between light and dark. Reads `resolvedTheme` from `next-themes` (not `theme`, so a user in `system` mode still toggles against the actually-rendered theme) and calls `setTheme(isDark ? 'light' : 'dark')`. Same Sun/Moon cross-fade icon pair as the original 3-way dropdown, but the dropdown is gone — the full Light/Dark/System picker still lives on the Settings page (`src/pages/settings.tsx`) for users who want auto-following OS theme. `aria-label` dynamically announces "Switch to light theme" / "Switch to dark theme". The full 3-way dropdown is intentionally not in the shell — it was overkill for a quick flip and the system option is a set-once preference, not a daily toggle.
+
+### ChatViewer (signature)
+The messenger surface at `/chats`, distinct from the Messaging workspace. Two panes inside a single `bg-card rounded-xl border` shell that fills the full main area (no `max-w-5xl` centered column, no outer padding — `app-shell.tsx` special-cases `/chats` so the layout owns the whole viewport below the top bar). A `border-r` divider separates them.
+
+- **List pane** (`aside`, `w-full md:w-80 lg:w-96`): sticky filter header (recessed `bg-muted/40` search input + `text-xs` "With media only" toggle) → plain `overflow-y-auto` list of rows (NOT `ScrollArea` — it doesn't expose a viewport ref for `IntersectionObserver.root`) → single muted footer line `{loaded} of {total} chats`. Each row: `<ChatAvatar>` + two-line body (name + timestamp-or-JID). Selected row = full `bg-accent text-accent-foreground` tint, no side-stripe. Infinite scroll: 50 per page, 200px bottom `rootMargin` preloads next page at ~80% scroll.
+- **Conversation pane** (`section`, `flex-1`): avatar header (`<ChatAvatar size="sm">` + name + mono JID + `<ChatControls>`), optional mobile back arrow (`md:hidden`, only when `onBack` is passed), recessed search + "Media only" filter row, then the message scroll surface (`bg-muted/30`, no inner border — the outer `bg-card` shell already provides chrome), then the reply preview chip (context chip with `border-l-2 border-primary` — the sanctioned exception to the side-stripe ban; side-stripes on cards/list-items/callouts are still banned), then the compose bar. No Newer/Older pager — older messages load via upward infinite scroll.
+- **ChatAvatar** (`features/chat/chat-avatar.tsx`): circular disc, single initial, deterministic hue from a 6-stop brand-harmonized palette (L/C held roughly constant, only hue varies). Used by both the list rows (`size="md"`) and the conversation header (`size="sm"`), so chat identity is visually consistent across panes.
+- **Message bubbles:** `rounded-2xl` + a single tail corner (`rounded-br-sm` outgoing, `rounded-bl-sm` incoming), `bg-bubble-out` / `bg-bubble-in` (the brand tokens). Group reactions into per-emoji pills with counts (`Map<string, number>`), never a joined string. Hover-only Reply + React buttons.
+- **Mobile master-detail:** tapping a chat sets `mobileShowConversation` → the aside hides and the section fills the width. The mobile back arrow in the conversation header clears it. Desktop (md+) ignores the flag; both panes are always visible.
+
 ## 6. Do's and Don'ts
 
 ### Do:
