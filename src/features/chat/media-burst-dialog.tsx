@@ -24,14 +24,16 @@ export function MediaBurstDialog({
   open,
   onOpenChange,
   zipName,
+  deviceId,
 }: {
   messages: readonly MessageInfo[]
   maxGapLabel: string
   open: boolean
   onOpenChange: (open: boolean) => void
   zipName: string
+  deviceId?: string
 }) {
-  const exporter = useMediaExport()
+  const exporter = useMediaExport(deviceId)
   const empty = messages.length === 0
 
   const handleZip = async () => {
@@ -62,7 +64,7 @@ export function MediaBurstDialog({
           <ul className="divide-border max-h-96 divide-y overflow-y-auto">
             {messages.map((message) => (
               <li key={message.id} className="flex items-center gap-3 py-2">
-                <BurstThumbnail message={message} enabled={open} />
+                <BurstThumbnail message={message} enabled={open} deviceId={deviceId} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-mono text-xs">{message.filename || 'untitled'}</p>
                   <p className="text-muted-foreground font-mono text-xs">
@@ -122,15 +124,15 @@ export function MediaBurstDialog({
  * while the parent dialog is open so opening and closing the dialog does not
  * fan out network work.
  */
-function BurstThumbnail({ message, enabled }: { message: MessageInfo; enabled: boolean }) {
+function BurstThumbnail({ message, enabled, deviceId }: { message: MessageInfo; enabled: boolean; deviceId?: string }) {
   const baseUrl = useConnection((state) => state.baseUrl)
   const { data: info } = useAppInfo()
   const [errored, setErrored] = useState(false)
 
   const showRemote = enabled && (message.media_type === 'image' || message.media_type === 'video')
   const query = useQuery({
-    queryKey: ['media', message.id, message.chat_jid],
-    queryFn: () => downloadMedia(message.id, message.chat_jid),
+    queryKey: ['media', message.id, message.chat_jid, deviceId],
+    queryFn: () => downloadMedia(message.id, message.chat_jid, deviceId),
     enabled: showRemote,
     staleTime: Infinity,
     retry: false,

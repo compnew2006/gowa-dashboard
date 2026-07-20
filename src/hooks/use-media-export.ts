@@ -36,7 +36,7 @@ export interface MediaExport {
  * rather than `useActionMutation` (whose onSuccess/onError contract is for
  * form mutations only).
  */
-export function useMediaExport(): MediaExport {
+export function useMediaExport(deviceId?: string): MediaExport {
   const baseUrl = useConnection((state) => state.baseUrl)
   const { data: info } = useAppInfo()
 
@@ -51,14 +51,14 @@ export function useMediaExport(): MediaExport {
 
   const fetchBlob = useCallback(async (message: MessageInfo): Promise<Blob> => {
     const { baseUrl: b, basePath } = ctxRef.current
-    const meta = await downloadMedia(message.id, message.chat_jid)
+    const meta = await downloadMedia(message.id, message.chat_jid, deviceId)
     const src = rerootServerUrl(b ?? '', meta.file_path, basePath)
     const response = await fetch(src)
     if (!response.ok) {
       throw new Error(`Download failed (${response.status}) for ${message.id}`)
     }
     return response.blob()
-  }, [])
+  }, [deviceId])
 
   const runBatch = useCallback(
     async (

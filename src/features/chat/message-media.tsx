@@ -17,13 +17,13 @@ import type { MessageInfo } from '@/api/chat'
  * `BurstThumbnail` via the `['media', message.id, message.chat_jid]` key) when
  * they later open the burst dialog or click "Download as ZIP".
  */
-export function MessageMedia({ message }: { message: MessageInfo }) {
+export function MessageMedia({ message, deviceId }: { message: MessageInfo; deviceId?: string }) {
   const baseUrl = useConnection((state) => state.baseUrl)
   const { data: info } = useAppInfo()
 
   const query = useQuery({
-    queryKey: ['media', message.id, message.chat_jid],
-    queryFn: () => downloadMedia(message.id, message.chat_jid),
+    queryKey: ['media', message.id, message.chat_jid, deviceId],
+    queryFn: () => downloadMedia(message.id, message.chat_jid, deviceId),
     enabled: true,
     staleTime: Infinity,
     retry: false,

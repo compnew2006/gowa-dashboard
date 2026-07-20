@@ -71,7 +71,7 @@ function NavContent({
       {navGroups.map((group) => (
         <div key={group.label} className={cn('flex flex-col', collapsed ? 'gap-0.5' : 'gap-1')}>
           {!collapsed && (
-            <p className="text-muted-foreground px-3 text-[11px] font-medium tracking-wider uppercase text-start">
+            <p className="text-muted-foreground px-3 text-[11px] font-medium tracking-wider uppercase text-start ltr:text-left rtl:text-right">
               {t(group.label)}
             </p>
           )}
@@ -88,7 +88,7 @@ function NavContent({
                 title={collapsed ? t(label) : undefined}
                 className={({ isActive }) =>
                   cn(
-                    'flex items-center gap-2.5 rounded-full px-3 py-2 text-sm font-medium transition-colors text-start',
+                    'flex items-center gap-2.5 rounded-full px-3 py-2 text-sm font-medium transition-colors text-start ltr:text-left rtl:text-right',
                     isActive
                       ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                       : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground',

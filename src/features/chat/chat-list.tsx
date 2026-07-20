@@ -110,6 +110,22 @@ function DeviceTag({ row }: { row: MergedChatRow }) {
 
 type ChatMode = 'this' | 'all'
 
+function useDebounce<T>(value: T, delay = 300): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value)
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value)
+    }, delay)
+
+    return () => {
+      clearTimeout(handler)
+    }
+  }, [value, delay])
+
+  return debouncedValue
+}
+
 export function ChatList({
   selectedJid,
   onSelect,
@@ -126,6 +142,7 @@ export function ChatList({
 }) {
   const { t } = useTranslation()
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 300)
   const [hasMedia, setHasMedia] = useState(false)
   const [mode, setMode] = useState<ChatMode>('this')
   const deviceId = useSelectedDevice()
@@ -141,10 +158,10 @@ export function ChatList({
   // matches the per-device key used in `useAllDeviceChats`, so toggling
   // between modes is a cache hit (no refetch spinner).
   const thisDeviceQuery = useInfiniteQuery({
-    queryKey: ['chats', deviceId, { search, hasMedia }],
+    queryKey: ['chats', deviceId, { search: debouncedSearch, hasMedia }],
     queryFn: ({ pageParam }) =>
       listChats({
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         has_media: hasMedia || undefined,
         limit: PAGE_SIZE,
         offset: pageParam,
@@ -163,7 +180,7 @@ export function ChatList({
     enabled: mode === 'this',
   })
 
-  const allDevices = useAllDeviceChats({ search, hasMedia, selectedJid })
+  const allDevices = useAllDeviceChats({ search: debouncedSearch, hasMedia, selectedJid })
   // Mount the per-device query owners when in All-devices mode so the
   // Rules-of-Hooks-compliant children can lift their snapshots up. In
   // This-device mode this renders null and the per-device queries are not
@@ -186,9 +203,44 @@ export function ChatList({
 
   const isAllMode = mode === 'all'
   const mergedRows = isAllMode ? allDevices.rows : []
-  const visibleChats = isAllMode ? mergedRows.map((r) => r.chat) : thisDeviceChats
+
+  // Immediate/realtime client-side filter to ensure responsive and 100% correct matching
+  const filteredThisDeviceChats = (() => {
+    let list = thisDeviceChats
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter((c) => {
+        const phone = jidToPhone(c.jid)
+        return (
+          c.name?.toLowerCase().includes(q) ||
+          c.jid.toLowerCase().includes(q) ||
+          phone.includes(q)
+        )
+      })
+    }
+    return list
+  })()
+
+  const filteredMergedRows = (() => {
+    let list = mergedRows
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter((row) => {
+        const c = row.chat
+        const phone = jidToPhone(c.jid)
+        return (
+          c.name?.toLowerCase().includes(q) ||
+          c.jid.toLowerCase().includes(q) ||
+          phone.includes(q)
+        )
+      })
+    }
+    return list
+  })()
+
+  const visibleChats = isAllMode ? filteredMergedRows.map((r) => r.chat) : filteredThisDeviceChats
   const total = isAllMode
-    ? mergedRows.length
+    ? filteredMergedRows.length
     : (thisDeviceQuery.data?.pages[0]?.pagination.total ?? 0)
   const isLoading = isAllMode ? allDevices.isLoading : thisDeviceQuery.isLoading
   const isFetchingNextPage = isAllMode ? allDevices.isFetchingNextPage : thisDeviceQuery.isFetchingNextPage
@@ -292,7 +344,7 @@ export function ChatList({
       </div>
 
       <div ref={scrollRef} className="chat-scroll min-h-0 flex-1 overflow-y-auto">
-        {isLoading ? (
+        {isLoading && visibleChats.length === 0 ? (
           <div className="flex justify-center p-6">
             <Loader2 className="text-muted-foreground size-5 animate-spin" />
           </div>
@@ -302,7 +354,7 @@ export function ChatList({
           <>
             <ul className="divide-y">
               {isAllMode
-                ? mergedRows.map((row) => (
+                ? filteredMergedRows.map((row) => (
                     <MergedRow
                       key={row.chat.jid}
                       row={row}
@@ -310,7 +362,7 @@ export function ChatList({
                       onSelect={onSelect}
                     />
                   ))
-                : thisDeviceChats.map((chat) => (
+                : filteredThisDeviceChats.map((chat) => (
                     <ThisDeviceRow
                       key={chat.jid}
                       chat={chat}

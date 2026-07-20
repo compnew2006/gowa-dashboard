@@ -17,7 +17,7 @@ export default function SettingsPage() {
 
   return (
     <PageSurface padded>
-      <div className="mx-auto flex max-w-2xl flex-col gap-5">
+      <div className="mx-auto flex max-w-2xl flex-col gap-5 text-start ltr:text-left rtl:text-right">
         <PageHeader
           title={t('Settings')}
           description={t('Dashboard connection and server info.')}

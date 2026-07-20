@@ -178,7 +178,7 @@ function MessageBubble({
             )}
           </p>
         )}
-        {hasMedia && <MessageMedia message={message} />}
+        {hasMedia && <MessageMedia message={message} deviceId={deviceId} />}
         {reactionsByEmoji && reactionsByEmoji.size > 0 && (
           <div className="mt-1.5 flex flex-wrap gap-1">
             {Array.from(reactionsByEmoji, ([emoji, list]) => (
@@ -291,6 +291,22 @@ function MessageBubble({
   )
 }
 
+function useDebounce<T>(value: T, delay = 300): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value)
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value)
+    }, delay)
+
+    return () => {
+      clearTimeout(handler)
+    }
+  }, [value, delay])
+
+  return debouncedValue
+}
+
 export function MessageView({
   chat,
   deviceId,
@@ -346,6 +362,7 @@ export function MessageView({
   } | null>(null)
   const [search, setSearch] = useState('')
   const [mediaOnly, setMediaOnly] = useState(false)
+  const debouncedSearch = useDebounce(search, 300)
   const [draft, setDraft] = useState('')
   const [replyTarget, setReplyTarget] = useState<MessageInfo | null>(null)
   // Burst gap (the configurable "files arriving close together" window) lives
@@ -376,13 +393,13 @@ export function MessageView({
   const { data: appInfo } = useAppInfo()
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery({
-    queryKey: ['chat-messages', deviceId, chat.jid, { search, mediaOnly }],
+    queryKey: ['chat-messages', deviceId, chat.jid, { search: debouncedSearch, mediaOnly }],
     initialPageParam: 0,
     queryFn: ({ pageParam }) =>
       getChatMessages(
         chat.jid,
         {
-          search: search || undefined,
+          search: debouncedSearch || undefined,
           media_only: mediaOnly || undefined,
           limit: PAGE_SIZE,
           offset: pageParam,
@@ -412,6 +429,26 @@ export function MessageView({
   // invariant: render maps over `ordered`; day-separator reads `ordered[index-1]`.
   const messages = data?.pages.flatMap((p) => p.data) ?? []
   const ordered = [...messages].reverse()
+
+  // Immediate/realtime client-side filter to ensure responsive and 100% correct matching
+  const filteredOrdered = (() => {
+    let list = ordered
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter((m) => {
+        return (
+          m.content?.toLowerCase().includes(q) ||
+          m.filename?.toLowerCase().includes(q) ||
+          m.sender_jid.toLowerCase().includes(q)
+        )
+      })
+    }
+    if (mediaOnly) {
+      list = list.filter((m) => !!m.media_type)
+    }
+    return list
+  })()
+
   // Burst is computed from `ordered` (not the un-reversed `messages`) so the
   // clustered list in the dialog reads top-to-bottom in chronological order.
   const burst = useMediaBurst(ordered, maxGapMs)
@@ -802,7 +839,7 @@ export function MessageView({
             {`${burst.files.length} file${burst.files.length === 1 ? '' : 's'} ${t('just in')}`}
           </Button>
         )}
-        {isLoading ? (
+        {isLoading && filteredOrdered.length === 0 ? (
           <div className="flex justify-center p-6">
             <Loader2 className="text-muted-foreground size-5 animate-spin" />
           </div>
@@ -813,6 +850,10 @@ export function MessageView({
               {t('Messages appear here as they are sent or received, and as WhatsApp history sync batches are processed after pairing. Contacts synced from your address book start without message history.')}
             </p>
           </div>
+        ) : filteredOrdered.length === 0 ? (
+          <div className="text-muted-foreground flex h-full flex-col items-center justify-center gap-1 p-6 text-center text-sm">
+            <p>{t('No messages found')}</p>
+          </div>
         ) : (
           <>
             <div ref={sentinelRef} className="h-1 w-full" aria-hidden="true" />
@@ -821,15 +862,15 @@ export function MessageView({
                 <Loader2 className="text-muted-foreground size-4 animate-spin" />
               </div>
             )}
-            {!hasNextPage && ordered.length > 0 && (
+            {!hasNextPage && filteredOrdered.length > 0 && (
               <div className="text-muted-foreground py-2 text-center text-xs">
                 {t('Start of conversation')}
               </div>
             )}
             <div className="flex flex-col gap-2">
-              {ordered.map((message, index) => {
+              {filteredOrdered.map((message, index) => {
                 const showDateSeparator =
-                  index === 0 || dayKey(message.timestamp) !== dayKey(ordered[index - 1].timestamp)
+                  index === 0 || dayKey(message.timestamp) !== dayKey(filteredOrdered[index - 1].timestamp)
                 const showUnreadDivider = unreadDivider?.anchorId === message.id
                 return (
                   <div key={message.id} data-msg-id={message.id}>

@@ -56,6 +56,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'Reaction sent': 'Reaction sent',
     'Message sent': 'Message sent',
     'Failed to load messages': 'Failed to load messages',
+    'No messages found': 'No messages found',
 
     // Devices / Dashboard
     'WhatsApp accounts connected to this server': 'WhatsApp accounts connected to this server',
@@ -212,6 +213,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'Reaction sent': 'تم إرسال التفاعل',
     'Message sent': 'تم إرسال الرسالة',
     'Failed to load messages': 'فشل في تحميل الرسائل',
+    'No messages found': 'لم يتم العثور على رسائل',
 
     // Devices / Dashboard
     'WhatsApp accounts connected to this server': 'حسابات WhatsApp المتصلة بهذا الخادم',
