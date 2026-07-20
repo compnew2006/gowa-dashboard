@@ -16,6 +16,7 @@ export function SendVideoForm() {
   const [viewOnce, setViewOnce] = useState(false)
   const [compress, setCompress] = useState(true)
   const [gifPlayback, setGifPlayback] = useState(false)
+  const [replyId, setReplyId] = useState('')
 
   const mutation = useActionMutation(sendVideo, { successMessage: 'Video sent' })
 
@@ -29,6 +30,7 @@ export function SendVideoForm() {
     gif_playback: gifPlayback,
     // view_once messages cannot be forwarded per the WhatsApp protocol
     is_forwarded: viewOnce ? false : undefined,
+    reply_message_id: replyId || undefined,
   }
 
   const onSubmit = (event: FormEvent) => {
@@ -45,6 +47,14 @@ export function SendVideoForm() {
           id="video-caption"
           value={caption}
           onChange={(event) => setCaption(event.target.value)}
+        />
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="video-reply">Reply to message ID (optional)</Label>
+        <Input
+          id="video-reply"
+          value={replyId}
+          onChange={(event) => setReplyId(event.target.value)}
         />
       </div>
       <label className="flex items-center gap-2 text-sm">

@@ -53,7 +53,19 @@ function useBootstrap() {
             if (removed && removed === selectedDeviceId) selectDevice(null)
             break
           }
+          case 'message.event':
+            // Backend signal that a message or reaction landed (Half 1 of the
+            // reactions-visibility fix). Invalidating both query families makes
+            // the new pill / quote bubble appear within ~1s instead of waiting
+            // for the 5s refetchInterval poll.
+            void queryClient.invalidateQueries({ queryKey: ['chats'] })
+            void queryClient.invalidateQueries({ queryKey: ['chat-messages'] })
+            break
           default:
+            // For any other events (such as message, reaction, receipt, chat, etc.),
+            // invalidate chats and chat messages to keep the UI perfectly synchronized in real-time.
+            void queryClient.invalidateQueries({ queryKey: ['chats'] })
+            void queryClient.invalidateQueries({ queryKey: ['chat-messages'] })
             break
         }
       }),

@@ -8,6 +8,11 @@ export type WsEventCode =
   | 'PASSKEY_ERROR'
   | 'DEVICE_WEBHOOK_UPDATED'
   | 'DEVICE_WEBHOOK_CONFIG_UPDATED'
+  // Emitted by the backend whenever a message or reaction is received, so the
+  // UI can invalidate its chat-message cache immediately instead of waiting
+  // for the 5s poll. The literal value matches the backend constant
+  // WsCodeMessageEvent verbatim (ws.ts performs no case transform).
+  | 'message.event'
 
 export interface WsEvent {
   code: WsEventCode

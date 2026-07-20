@@ -88,22 +88,67 @@ function topIncomingId(ordered: readonly MessageInfo[], chatJid: string): string
 }
 
 
+function getReplyTargetInfo(message: MessageInfo, ordered: readonly MessageInfo[]) {
+  const replyId =
+    message.reply_to_message_id ||
+    message.reply_message_id ||
+    message.quoted_message_id ||
+    (message as any).reply_to_id
+  if (!replyId) return null
+
+  const found = ordered.find((m) => m.id === replyId)
+  if (found) {
+    return {
+      id: found.id,
+      sender: found.is_from_me ? 'Me' : jidToPhone(found.sender_jid),
+      content: found.content || (found.media_type ? `[${found.media_type}]` : ''),
+      is_from_me: found.is_from_me,
+    }
+  }
+
+  const rawSender =
+    message.reply_to_message_sender ||
+    message.quoted_message_sender ||
+    (message as any).reply_to_sender
+  const sender = rawSender
+    ? rawSender.includes('@')
+      ? jidToPhone(rawSender)
+      : rawSender
+    : 'User'
+
+  const content =
+    message.reply_to_message_text ||
+    message.quoted_message_text ||
+    (message as any).reply_to_text ||
+    (message as any).reply_to_content ||
+    (message as any).quoted_text ||
+    (message as any).quoted_content ||
+    'Original Message'
+
+  return {
+    id: replyId,
+    sender,
+    content,
+    is_from_me: rawSender ? rawSender === message.sender_jid && message.is_from_me : false,
+  }
+}
+
+
 function MessageBubble({
   message,
   chatJid,
   deviceId,
   onReply,
+  ordered,
 }: {
   message: MessageInfo
   chatJid: string
-  // Feature 2: the conversation's scoping device id, threaded from
-  // MessageView's prop. Reaction invalidation keys on it so a reaction sent
-  // from an All-devices-scoped conversation refreshes that device's messages,
-  // not the global one.
   deviceId: string
   onReply: (message: MessageInfo) => void
+  ordered: readonly MessageInfo[]
 }) {
   const queryClient = useQueryClient()
+  const replyInfo = useMemo(() => getReplyTargetInfo(message, ordered), [message, ordered])
   const hasMedia = message.media_type && message.media_type !== ''
   const [customEmoji, setCustomEmoji] = useState('')
   const { language } = useTranslation()
@@ -162,6 +207,34 @@ function MessageBubble({
       >
         {!message.is_from_me && (
           <p className="text-muted-foreground mb-1 font-mono text-xs">{jidToPhone(message.sender_jid)}</p>
+        )}
+        {replyInfo && (
+          <div
+            onClick={() => {
+              const el = document.querySelector(`[data-msg-id="${CSS.escape(replyInfo.id)}"]`)
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                el.classList.add('animate-pulse')
+                setTimeout(() => el.classList.remove('animate-pulse'), 1500)
+              }
+            }}
+            className={cn(
+              'mb-2 flex flex-col gap-0.5 rounded-lg border-l-4 p-2 pl-2.5 text-xs transition-colors cursor-pointer select-none',
+              message.is_from_me
+                ? 'bg-black/15 hover:bg-black/20 text-primary-foreground/90 border-primary-foreground/40'
+                : 'bg-muted hover:bg-muted/80 border-primary/50 text-foreground/90'
+            )}
+          >
+            <span className={cn(
+              'font-semibold text-[0.6875rem]',
+              message.is_from_me ? 'text-primary-foreground' : 'text-primary'
+            )}>
+              {replyInfo.sender}
+            </span>
+            <span className="line-clamp-1 break-words opacity-85">
+              {replyInfo.content}
+            </span>
+          </div>
         )}
         {message.content && (
           <p className="leading-relaxed break-words whitespace-pre-wrap">
@@ -938,6 +1011,7 @@ export function MessageView({
                       chatJid={chat.jid}
                       deviceId={deviceId}
                       onReply={setReplyTarget}
+                      ordered={ordered}
                     />
                   </div>
                 )

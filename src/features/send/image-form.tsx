@@ -15,6 +15,7 @@ export function SendImageForm() {
   const [caption, setCaption] = useState('')
   const [viewOnce, setViewOnce] = useState(false)
   const [compress, setCompress] = useState(true)
+  const [replyId, setReplyId] = useState('')
 
   const mutation = useActionMutation(sendImage, { successMessage: 'Image sent' })
 
@@ -27,6 +28,7 @@ export function SendImageForm() {
     compress,
     // view_once messages cannot be forwarded per the WhatsApp protocol
     is_forwarded: false,
+    reply_message_id: replyId || undefined,
   }
 
   const onSubmit = (event: FormEvent) => {
@@ -43,6 +45,14 @@ export function SendImageForm() {
           id="image-caption"
           value={caption}
           onChange={(event) => setCaption(event.target.value)}
+        />
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="image-reply">Reply to message ID (optional)</Label>
+        <Input
+          id="image-reply"
+          value={replyId}
+          onChange={(event) => setReplyId(event.target.value)}
         />
       </div>
       <label className="flex items-center gap-2 text-sm">

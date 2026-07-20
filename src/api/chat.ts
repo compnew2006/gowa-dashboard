@@ -35,6 +35,15 @@ export interface MessageInfo {
   filename: string
   url: string
   file_length: number
+
+  // Optional fields for quoted/replied-to message context
+  reply_to_message_id?: string
+  reply_to_message_text?: string
+  reply_to_message_sender?: string
+  reply_message_id?: string
+  quoted_message_id?: string
+  quoted_message_text?: string
+  quoted_message_sender?: string
 }
 
 export interface ListChatsParams {

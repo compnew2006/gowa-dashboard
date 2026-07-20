@@ -12,6 +12,7 @@ export function SendFileForm() {
   const jid = useRecipientJid()
   const [source, setSource] = useState<FileOrUrl>({ url: '' })
   const [caption, setCaption] = useState('')
+  const [replyId, setReplyId] = useState('')
 
   const mutation = useActionMutation(sendFile, { successMessage: 'File sent' })
 
@@ -20,6 +21,7 @@ export function SendFileForm() {
     file: source.file,
     fileUrl: source.url || undefined,
     caption,
+    reply_message_id: replyId || undefined,
   }
 
   const onSubmit = (event: FormEvent) => {
@@ -36,6 +38,14 @@ export function SendFileForm() {
           id="file-caption"
           value={caption}
           onChange={(event) => setCaption(event.target.value)}
+        />
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="file-reply">Reply to message ID (optional)</Label>
+        <Input
+          id="file-reply"
+          value={replyId}
+          onChange={(event) => setReplyId(event.target.value)}
         />
       </div>
       <FormActions

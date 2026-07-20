@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/specification/main/schemas/mcp.schema.json",
+  "_comment": "Example MCP server registration for the universal swarm. Copy to `.mcp.json` (Claude Code / ZCode project-scoped) or merge into `~/.zcode/settings.json` (user-scoped). The swarm runs WITHOUT any of these — this file only unlocks the preferred high-fidelity tools. See `.zcode/MCP_SETUP.md` for what each server does and the fallback when it is absent.",
+  "mcpServers": {
+    "serena": {
+      "_comment": "PRECISE SOURCE READS + EDITS. Preferred by all 4 agents for symbol overviews, exact function/struct/class bodies, referencing-symbol lookups, and Serena's insert/replace/rename/delete primitives. Fallback when absent: native Read/Grep/Glob + native Edit/Write (Builder only).",
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/oraios/serena", "serena-mcp-server"]
+    },
+    "socraticode": {
+      "_comment": "SEMANTIC SEARCH + IMPACT TRACING. Preferred for semantic codebase search (how is X already done?), the impact/symbol/flow tools (callers, callees, blast radius), and the dependency graph. Requires Qdrant + Ollama for embeddings — see the vendor docs. Fallback when absent: Grep for callers + Read for bodies.",
+      "command": "mcp-socraticode",
+      "args": [],
+      "env": {
+        "SOCRATICODE_PROJECT_PATH": "${PROJECT_ROOT}"
+      }
+    },
+    "codebase-memory-mcp": {
+      "_comment": "STRUCTURAL MEMORY + GRAPH QUERIES. Preferred for architecture overview, graph search by name or natural-language query, path tracing for call chains, change detection (diff → affected symbols), and Cypher queries for cross-service edges. Fallback when absent: Grep + Read + the agent's own reasoning.",
+      "command": "npx",
+      "args": ["-y", "codebase-memory-mcp"],
+      "env": {
+        "CODEBASE_MEMORY_PROJECT": "${PROJECT_NAME}"
+      }
+    }
+  },
+  "_fallback_summary": "If NONE of these servers are available, the swarm still runs: every agent falls back to the harness's native Read/Grep/Glob for source reading, native Edit/Write (Builder) for edits, and shell git grep/find for non-source concerns. Each agent states the fallback at the top of its output so confidence can be weighed. The only situation that halts the swarm is when even the native tools cannot produce the evidence a sound phase needs (e.g. a closed-source dependency)."
+}

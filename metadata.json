@@ -1,6 +1,6 @@
 {
-  "name": "Remix: Remix: gowa-dashboard",
-  "description": "Imported from GitHub: artxmidea-droid/gowa-dashboard",
+  "name": "Gowa WhatsApp Dashboard",
+  "description": "A browser dashboard for go-whatsapp-web-multidevice (gowa).",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

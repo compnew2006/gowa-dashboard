@@ -6,6 +6,8 @@ The whole app builds into **one HTML file** with no external dependencies. Host 
 
 Built with React 19, TypeScript, Vite, Tailwind CSS 4, and shadcn/ui.
 
+<!-- Maintainers: see AGENTS.md for build/routing/release conventions before editing. -->
+
 > **Status**: feature parity with gowa's embedded dashboard. Tagging a `v*` release publishes `gowa-ui.html`.
 
 ## How to use it
