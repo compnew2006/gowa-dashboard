@@ -22,6 +22,7 @@ export default function ChatsPage() {
   // opened. Cleared when the conversation closes (or implicitly re-set by the
   // next All-devices row).
   const [conversationDeviceId, setConversationDeviceId] = useState<string | null>(null)
+  const [owningDeviceIds, setOwningDeviceIds] = useState<string[]>([])
   // Mobile master-detail: when true, the conversation pane is shown full-screen
   // and the list pane is hidden. Tapping a chat flips this on; the mobile back
   // bar (rendered below, md:hidden) flips it off. Desktop ignores this flag
@@ -34,6 +35,7 @@ export default function ChatsPage() {
     const savedChat = localStorage.getItem(`gowa-ui.chats.selected-chat.${selectedDeviceId}`)
     const savedDev = localStorage.getItem(`gowa-ui.chats.selected-device.${selectedDeviceId}`)
     const savedMobileShow = localStorage.getItem(`gowa-ui.chats.selected-mobile-show.${selectedDeviceId}`)
+    const savedOwning = localStorage.getItem(`gowa-ui.chats.selected-owning-devices.${selectedDeviceId}`)
     
     if (savedChat) {
       try {
@@ -45,12 +47,26 @@ export default function ChatsPage() {
       setSelected(null)
     }
     setConversationDeviceId(savedDev || null)
+    if (savedOwning) {
+      try {
+        setOwningDeviceIds(JSON.parse(savedOwning))
+      } catch (_) {
+        setOwningDeviceIds([])
+      }
+    } else {
+      setOwningDeviceIds([])
+    }
     setMobileShowConversation(savedMobileShow === 'true')
   }, [selectedDeviceId])
 
-  const handleSelect = (chat: ChatInfo | null, rowDeviceId: string | null) => {
+  const handleSelect = (
+    chat: ChatInfo | null,
+    rowDeviceId: string | null,
+    rowOwningDeviceIds?: string[],
+  ) => {
     setSelected(chat)
     setConversationDeviceId(rowDeviceId ?? null)
+    setOwningDeviceIds(rowOwningDeviceIds ?? [])
     setMobileShowConversation(!!chat)
 
     if (selectedDeviceId) {
@@ -61,10 +77,16 @@ export default function ChatsPage() {
         } else {
           localStorage.removeItem(`gowa-ui.chats.selected-device.${selectedDeviceId}`)
         }
+        if (rowOwningDeviceIds) {
+          localStorage.setItem(`gowa-ui.chats.selected-owning-devices.${selectedDeviceId}`, JSON.stringify(rowOwningDeviceIds))
+        } else {
+          localStorage.removeItem(`gowa-ui.chats.selected-owning-devices.${selectedDeviceId}`)
+        }
         localStorage.setItem(`gowa-ui.chats.selected-mobile-show.${selectedDeviceId}`, 'true')
       } else {
         localStorage.removeItem(`gowa-ui.chats.selected-chat.${selectedDeviceId}`)
         localStorage.removeItem(`gowa-ui.chats.selected-device.${selectedDeviceId}`)
+        localStorage.removeItem(`gowa-ui.chats.selected-owning-devices.${selectedDeviceId}`)
         localStorage.removeItem(`gowa-ui.chats.selected-mobile-show.${selectedDeviceId}`)
       }
     }
@@ -155,7 +177,7 @@ export default function ChatsPage() {
         >
           <ChatList
             selectedJid={selected?.jid ?? null}
-            onSelect={(chat, dId) => handleSelect(chat, dId ?? null)}
+            onSelect={(chat, dId, owningIds) => handleSelect(chat, dId ?? null, owningIds)}
           />
 
           {/* Resize handle */}
@@ -173,6 +195,13 @@ export default function ChatsPage() {
             <MessageView
               chat={selected}
               deviceId={effectiveDeviceId}
+              owningDeviceIds={owningDeviceIds}
+              onDeviceIdChange={(id) => {
+                setConversationDeviceId(id)
+                if (selectedDeviceId) {
+                  localStorage.setItem(`gowa-ui.chats.selected-device.${selectedDeviceId}`, id)
+                }
+              }}
               onBack={handleBack}
             />
           ) : (

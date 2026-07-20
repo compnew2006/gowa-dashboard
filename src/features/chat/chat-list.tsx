@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query'
-import { Loader2, Search, X } from 'lucide-react'
+import { ChevronDown, Loader2, Search, X } from 'lucide-react'
 import { listChats, type ChatInfo } from '@/api/chat'
 import { ChatAvatar } from '@/features/chat/chat-avatar'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,15 @@ import { DeviceSwitcher } from '@/components/layout/device-switcher'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu'
 import { useAllDeviceChats } from '@/hooks/use-all-device-chats'
 import { useDevices } from '@/hooks/use-devices'
 import { useSelectedDevice } from '@/hooks/use-device-guard'
@@ -73,14 +82,15 @@ function UnreadBadge({ count }: { count: number }) {
  * `title` lists every device that carries this jid when the merge deduped
  * multiple owners into one row.
  */
-function DeviceTag({ row }: { row: MergedChatRow }) {
+function DeviceTag({ deviceId }: { deviceId: string }) {
   const [alias, setAlias] = useState(() => {
-    return localStorage.getItem(`gowa-ui.device-alias.${row.deviceId}`) || ''
+    return localStorage.getItem(`gowa-ui.device-alias.${deviceId}`) || ''
   })
+  const { data: devices } = useDevices()
 
   useEffect(() => {
     const handleUpdate = () => {
-      setAlias(localStorage.getItem(`gowa-ui.device-alias.${row.deviceId}`) || '')
+      setAlias(localStorage.getItem(`gowa-ui.device-alias.${deviceId}`) || '')
     }
     window.addEventListener('device-alias-updated', handleUpdate)
     window.addEventListener('storage', handleUpdate)
@@ -88,19 +98,17 @@ function DeviceTag({ row }: { row: MergedChatRow }) {
       window.removeEventListener('device-alias-updated', handleUpdate)
       window.removeEventListener('storage', handleUpdate)
     }
-  }, [row.deviceId])
+  }, [deviceId])
 
-  const label = alias || row.deviceId || row.device.id
-  const others = row.owningDeviceIds.filter((id) => id !== row.deviceId)
-  const title =
-    others.length > 0
-      ? `Also on: ${others.join(', ')}`
-      : `Device: ${row.device.display_name ?? row.device.id}`
+  const device = devices?.find((d) => d.id === deviceId)
+  const displayName = device?.display_name || deviceId
+  const label = alias || displayName
+
   return (
     <span
-      title={title}
+      title={`Device: ${displayName}`}
       className={cn(
-        'bg-primary/10 text-primary inline-flex h-5 max-w-[16rem] shrink-0 items-center truncate rounded-full px-1.5 font-mono text-xs',
+        'bg-primary/10 text-primary inline-flex h-5 max-w-[12rem] shrink-0 items-center truncate rounded-full px-1.5 font-mono text-[10px] font-semibold',
       )}
     >
       {label}
@@ -138,21 +146,34 @@ export function ChatList({
    * single-device callers (This-device mode) ignore it; the call site stays
    * backwards-compatible because the second argument is optional.
    */
-  onSelect: (chat: ChatInfo, deviceId?: string) => void
+  onSelect: (chat: ChatInfo, deviceId?: string, owningDeviceIds?: string[]) => void
 }) {
   const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounce(search, 300)
   const [hasMedia, setHasMedia] = useState(false)
   const [mode, setMode] = useState<ChatMode>('this')
+  const [selectedMultiDeviceIds, setSelectedMultiDeviceIds] = useState<string[]>([])
   const deviceId = useSelectedDevice()
   const devicesQuery = useDevices()
+
+  const loggedInDevices = useMemo(() => {
+    return (devicesQuery.data ?? []).filter((d) => d.state === 'logged_in')
+  }, [devicesQuery.data])
 
   // Count of connected devices gates the "All devices" toggle: with fewer
   // than two logged_in devices, the merged list is identical to the
   // single-device list, so the option disables with a Tooltip.
-  const connectedCount = (devicesQuery.data ?? []).filter((d) => d.state === 'logged_in').length
+  const connectedCount = loggedInDevices.length
   const allDevicesDisabled = connectedCount < 2
+
+  // Sync selectedMultiDeviceIds when devices list changes
+  useEffect(() => {
+    if (selectedMultiDeviceIds.length > 0) {
+      const activeIds = loggedInDevices.map((d) => d.id)
+      setSelectedMultiDeviceIds((prev) => prev.filter((id) => activeIds.includes(id)))
+    }
+  }, [loggedInDevices, selectedMultiDeviceIds.length])
 
   // Single-device query path — unchanged from before Feature 2. The cache key
   // matches the per-device key used in `useAllDeviceChats`, so toggling
@@ -180,7 +201,12 @@ export function ChatList({
     enabled: mode === 'this',
   })
 
-  const allDevices = useAllDeviceChats({ search: debouncedSearch, hasMedia, selectedJid })
+  const allDevices = useAllDeviceChats({
+    search: debouncedSearch,
+    hasMedia,
+    selectedJid,
+    selectedDeviceIds: selectedMultiDeviceIds,
+  })
   // Mount the per-device query owners when in All-devices mode so the
   // Rules-of-Hooks-compliant children can lift their snapshots up. In
   // This-device mode this renders null and the per-device queries are not
@@ -315,21 +341,76 @@ export function ChatList({
             <TooltipTrigger asChild>
               {/* Span wrapper so the Tooltip can wrap a disabled Button (radix
                   tooltip does not forward to disabled elements natively). The
-                  single "All devices" toggle replaces the old two-button
-                  This/All group: pressed = merge all devices, outline = show
-                  only the device currently picked in the droplist. */}
+                  single "All devices" toggle is now a multi-device switcher
+                  dropdown, allowing selecting 1, 2, 3 or all devices. */}
               <span tabIndex={allDevicesDisabled ? 0 : -1} className="inline-flex">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={mode === 'all' ? 'default' : 'outline'}
-                  aria-pressed={mode === 'all'}
-                  aria-label="Merge chats across all devices"
-                  disabled={allDevicesDisabled}
-                  onClick={() => setMode(mode === 'all' ? 'this' : 'all')}
-                >
-                  {t('All devices')}
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={mode === 'all' ? 'default' : 'outline'}
+                      aria-pressed={mode === 'all'}
+                      disabled={allDevicesDisabled}
+                      className="gap-1 px-2.5"
+                    >
+                      {mode === 'all'
+                        ? selectedMultiDeviceIds.length === 0 || selectedMultiDeviceIds.length === connectedCount
+                          ? t('All devices')
+                          : `${t('Devices')} (${selectedMultiDeviceIds.length})`
+                        : t('All devices')}
+                      <ChevronDown className="size-3.5 opacity-60" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>{t('Multi-Device View')}</DropdownMenuLabel>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        if (mode === 'all') {
+                          setMode('this')
+                        } else {
+                          setMode('all')
+                        }
+                      }}
+                    >
+                      <span className={cn('size-1.5 rounded-full mr-2 ltr:mr-2 rtl:ml-2', mode === 'all' ? 'bg-emerald-500' : 'bg-muted-foreground')} />
+                      {mode === 'all' ? t('Disable Merged View') : t('Enable Merged View')}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {loggedInDevices.map((device) => {
+                      const alias = localStorage.getItem(`gowa-ui.device-alias.${device.id}`) || ''
+                      const label = alias || device.display_name || device.id
+                      const isChecked = selectedMultiDeviceIds.length === 0
+                        ? true
+                        : selectedMultiDeviceIds.includes(device.id)
+
+                      return (
+                        <DropdownMenuCheckboxItem
+                          key={device.id}
+                          checked={isChecked}
+                          onCheckedChange={(checked: boolean) => {
+                            setMode('all')
+                            setSelectedMultiDeviceIds((prev) => {
+                              const current = prev.length === 0 ? loggedInDevices.map((d) => d.id) : prev
+                              let next: string[]
+                              if (checked) {
+                                next = [...current, device.id]
+                              } else {
+                                next = current.filter((id) => id !== device.id)
+                              }
+                              if (next.length === 0) {
+                                return []
+                              }
+                              return next
+                            })
+                          }}
+                        >
+                          <span className="truncate">{label}</span>
+                        </DropdownMenuCheckboxItem>
+                      )
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </span>
             </TooltipTrigger>
             {allDevicesDisabled && (
@@ -412,7 +493,7 @@ function ThisDeviceRow({
    */
   deviceId: string | null
   selected: boolean
-  onSelect: (chat: ChatInfo, deviceId?: string) => void
+  onSelect: (chat: ChatInfo, deviceId?: string, owningDeviceIds?: string[]) => void
 }) {
   const unread = useEffectiveUnread(deviceId, chat)
   const phone = jidToPhone(chat.jid)
@@ -420,7 +501,7 @@ function ThisDeviceRow({
     <li>
       <button
         type="button"
-        onClick={() => onSelect(chat)}
+        onClick={() => onSelect(chat, deviceId || undefined, deviceId ? [deviceId] : [])}
         className={cn(
           'flex w-full items-center gap-3 px-3 py-3 text-start transition-colors',
           selected ? 'bg-accent text-accent-foreground' : 'hover:bg-muted/60',
@@ -457,7 +538,7 @@ function MergedRow({
 }: {
   row: MergedChatRow
   selected: boolean
-  onSelect: (chat: ChatInfo, deviceId?: string) => void
+  onSelect: (chat: ChatInfo, deviceId?: string, owningDeviceIds?: string[]) => void
 }) {
   const { chat, deviceId } = row
   // Feature 3: the unread badge is keyed on the merged row's owning device id
@@ -470,7 +551,7 @@ function MergedRow({
     <li>
       <button
         type="button"
-        onClick={() => onSelect(chat, deviceId)}
+        onClick={() => onSelect(chat, deviceId, row.owningDeviceIds)}
         className={cn(
           'flex w-full items-center gap-3 px-3 py-3 text-start transition-colors',
           selected ? 'bg-accent text-accent-foreground' : 'hover:bg-muted/60',
@@ -479,16 +560,20 @@ function MergedRow({
         <ChatAvatar name={chat.name || chat.jid} jid={chat.jid} size="md" />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex items-center justify-between gap-1.5">
-            <span className="flex min-w-0 flex-1 items-center gap-1.5">
+            <span className="flex min-w-0 flex-1 items-center gap-1.5 flex-wrap">
               <span
                 className={cn(
-                  'truncate text-sm',
+                  'truncate text-sm max-w-[12rem]',
                   selected ? 'text-accent-foreground font-semibold' : 'font-medium',
                 )}
               >
                 {chat.name || phone || chat.jid}
               </span>
-              <DeviceTag row={row} />
+              <div className="flex flex-wrap gap-1 items-center shrink-0">
+                {row.owningDeviceIds.map((id) => (
+                  <DeviceTag key={id} deviceId={id} />
+                ))}
+              </div>
             </span>
           </span>
           <span className="flex items-center justify-between gap-1.5 mt-0.5">

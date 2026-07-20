@@ -176,6 +176,7 @@ export function useAllDeviceChats({
   search,
   hasMedia,
   selectedJid,
+  selectedDeviceIds,
 }: {
   search: string
   hasMedia: boolean
@@ -185,11 +186,18 @@ export function useAllDeviceChats({
    * unread bump for that jid. `null` when no conversation is open.
    */
   selectedJid: string | null
+  selectedDeviceIds?: string[]
 }): UseAllDeviceChatsResult {
   const devicesQuery = useDevices()
   const devices = useMemo(
-    () => (devicesQuery.data ?? []).filter((d) => d.state === 'logged_in'),
-    [devicesQuery.data],
+    () => {
+      const allLogged = (devicesQuery.data ?? []).filter((d) => d.state === 'logged_in')
+      if (selectedDeviceIds && selectedDeviceIds.length > 0) {
+        return allLogged.filter((d) => selectedDeviceIds.includes(d.id))
+      }
+      return allLogged
+    },
+    [devicesQuery.data, selectedDeviceIds],
   )
 
   const [snapshots, setSnapshots] = useState<Record<string, DeviceSnapshot>>({})

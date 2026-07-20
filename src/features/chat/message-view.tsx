@@ -34,6 +34,8 @@ import { useAppInfo } from '@/hooks/use-app-info'
 import { useChatScroll } from '@/hooks/use-chat-scroll'
 import { useSettingsStore } from '@/stores/settings'
 import { useUnreadStore } from '@/stores/unread'
+import { useDevices } from '@/hooks/use-devices'
+import type { RegistryDevice } from '@/api/types'
 import { computeUnreadDelta } from '@/lib/unread-diff'
 import { classifyMedia } from '@/lib/media-classify'
 import { MAX_MEDIA_BYTES, validateMediaFile } from '@/lib/media-validate'
@@ -112,7 +114,9 @@ function MessageBubble({
   // empty emoji is a remove per the existing ReactForm contract.
   const reactMutation = useActionMutation(
     (vars: { messageId: string; emoji: string }) =>
-      exec(reactRequest(vars.messageId, { phone: chatJid, emoji: vars.emoji })),
+      exec(reactRequest(vars.messageId, { phone: chatJid, emoji: vars.emoji }), {
+        headers: deviceId ? { 'X-Device-Id': encodeURIComponent(deviceId) } : undefined,
+      }),
     {
       successMessage: 'Reaction sent',
       onSuccess: () => {
@@ -152,7 +156,7 @@ function MessageBubble({
         className={cn(
           'w-[350px] max-w-[85%] rounded-[1.25rem] px-3.5 py-2 text-sm ring-1 transition-colors',
           message.is_from_me
-            ? 'bg-bubble-out text-foreground ring-bubble-out/40 rounded-br-md'
+            ? 'bg-bubble-out text-primary-foreground ring-bubble-out/40 rounded-br-md'
             : 'bg-bubble-in text-foreground ring-border rounded-bl-md',
         )}
       >
@@ -168,7 +172,12 @@ function MessageBubble({
                   href={token.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary hover:text-primary/80 underline underline-offset-2 transition-colors"
+                  className={cn(
+                    'underline underline-offset-2 transition-colors font-medium',
+                    message.is_from_me
+                      ? 'text-primary-foreground hover:text-primary-foreground/80'
+                      : 'text-primary hover:text-primary/80',
+                  )}
                 >
                   {token.value}
                 </a>
@@ -210,7 +219,7 @@ function MessageBubble({
         <p
           className={cn(
             'mt-1 text-right text-[0.6875rem] tabular-nums',
-            message.is_from_me ? 'text-primary/70' : 'text-muted-foreground',
+            message.is_from_me ? 'text-primary-foreground/70' : 'text-muted-foreground',
           )}
         >
           {formatDate(message.timestamp)}
@@ -310,6 +319,8 @@ function useDebounce<T>(value: T, delay = 300): T {
 export function MessageView({
   chat,
   deviceId,
+  owningDeviceIds,
+  onDeviceIdChange,
   onBack,
 }: {
   chat: ChatInfo
@@ -325,6 +336,8 @@ export function MessageView({
    * own device's query cache.
    */
   deviceId: string
+  owningDeviceIds?: string[]
+  onDeviceIdChange?: (id: string) => void
   onBack?: () => void
 }) {
   const { t } = useTranslation()
@@ -391,6 +404,7 @@ export function MessageView({
   // "pure function of (file, limits)" so the hook just feeds it the right
   // ceiling per kind.
   const { data: appInfo } = useAppInfo()
+  const { data: devices } = useDevices()
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery({
     queryKey: ['chat-messages', deviceId, chat.jid, { search: debouncedSearch, mediaOnly }],
@@ -459,11 +473,17 @@ export function MessageView({
   // clears this chat's unread badge in the store (Feature 3): opening a
   // conversation is the read event, and resets the divider cursor so a stale
   // anchor from the previously-open chat does not leak in.
+  // We also clear chat-specific state (replyTarget, draft, search, mediaOnly)
+  // so switching conversations does not carry over stale state.
   useEffect(() => {
     stickToBottomRef.current = true
     observerArmedRef.current = true
     prevTopIncomingIdRef.current = null
     setUnreadDivider(null)
+    setReplyTarget(null)
+    setDraft('')
+    setSearch('')
+    setMediaOnly(false)
     useUnreadStore.getState().clear(deviceId, chat.jid)
   }, [chat.jid, deviceId])
 
@@ -788,6 +808,23 @@ export function MessageView({
         <ChatControls chat={chat} />
       </div>
 
+      {owningDeviceIds && owningDeviceIds.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2 border-b bg-muted/20 px-4 py-2 text-xs">
+          <span className="text-muted-foreground font-medium shrink-0">{t('Viewing Account:')}</span>
+          <div className="flex flex-wrap gap-1.5">
+            {owningDeviceIds.map((id) => (
+              <DeviceTabButton
+                key={id}
+                id={id}
+                active={deviceId === id}
+                onClick={() => onDeviceIdChange?.(id)}
+                devices={devices}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col gap-2.5 border-b px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:max-w-xs">
           <Input
@@ -935,7 +972,7 @@ export function MessageView({
 
       <form
         className={cn(
-          'flex items-center gap-2 border-t px-3 py-2.5 transition-shadow',
+          'flex items-end gap-2 border-t px-3 py-2.5 transition-shadow',
           dragActive && 'ring-primary/40 ring-1',
         )}
         onSubmit={onSend}
@@ -969,19 +1006,29 @@ export function MessageView({
           size="icon"
           aria-label="Attach file"
           onClick={() => fileInputRef.current?.click()}
+          className="mb-0.5 shrink-0"
         >
           <Paperclip className="size-5" />
         </Button>
-        <Input
-          className="bg-muted/40 focus-visible:bg-background flex-1 rounded-[1.25rem] border-0 px-4 focus-visible:ring-1"
+        <textarea
+          rows={1}
+          className="bg-muted/40 focus-visible:bg-background flex-1 rounded-[1.25rem] border-0 px-4 py-2 focus-visible:ring-1 resize-none outline-none text-sm min-h-[38px] max-h-[120px] chat-scroll field-sizing-content leading-relaxed"
           placeholder="Type a message"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault()
+              if (draft.trim() && !sendMutation.isPending) {
+                sendMutation.mutate(draft.trim())
+              }
+            }
+          }}
         />
         <Button
           type="submit"
           size="icon-lg"
-          className="rounded-full"
+          className="rounded-full shrink-0"
           aria-label="Send message"
           disabled={sendMutation.isPending || !draft.trim()}
         >
@@ -1014,5 +1061,53 @@ export function MessageView({
         onSent={onFileSent}
       />
     </div>
+  )
+}
+
+function DeviceTabButton({
+  id,
+  active,
+  onClick,
+  devices,
+}: {
+  id: string
+  active: boolean
+  onClick: () => void
+  devices?: RegistryDevice[]
+}) {
+  const [alias, setAlias] = useState(() => {
+    return localStorage.getItem(`gowa-ui.device-alias.${id}`) || ''
+  })
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setAlias(localStorage.getItem(`gowa-ui.device-alias.${id}`) || '')
+    }
+    window.addEventListener('device-alias-updated', handleUpdate)
+    window.addEventListener('storage', handleUpdate)
+    return () => {
+      window.removeEventListener('device-alias-updated', handleUpdate)
+      window.removeEventListener('storage', handleUpdate)
+    }
+  }, [id])
+
+  const dev = devices?.find((d) => d.id === id)
+  const displayName = dev?.display_name || dev?.id || id
+  const label = alias || displayName
+
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant={active ? 'default' : 'outline'}
+      className={cn(
+        'h-7 px-2.5 text-xs font-mono rounded-full transition-all gap-1.5',
+        active ? 'shadow-sm' : 'text-muted-foreground hover:text-foreground',
+      )}
+      onClick={onClick}
+    >
+      <span className={cn('size-1.5 rounded-full shrink-0', active ? 'bg-background' : 'bg-muted-foreground')} />
+      {label}
+    </Button>
   )
 }

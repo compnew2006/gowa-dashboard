@@ -64,10 +64,11 @@ function NavContent({
   onNavigate?: () => void
   collapsed?: boolean
 }) {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
+  const isRtl = language === 'ar' || language === 'ur'
 
   return (
-    <nav className={cn('flex flex-col', collapsed ? 'gap-3' : 'gap-4')}>
+    <nav className={cn('flex flex-col', collapsed ? 'gap-3' : 'gap-4')} dir={isRtl ? 'rtl' : 'ltr'}>
       {navGroups.map((group) => (
         <div key={group.label} className={cn('flex flex-col', collapsed ? 'gap-0.5' : 'gap-1')}>
           {!collapsed && (
@@ -138,6 +139,7 @@ export function AppShell() {
   return (
     <div className="flex min-h-svh" dir={isRtl ? 'rtl' : 'ltr'}>
       <aside
+        dir={isRtl ? 'rtl' : 'ltr'}
         className={cn(
           'bg-sidebar text-sidebar-foreground hidden shrink-0 flex-col ltr:border-r rtl:border-l transition-[width] duration-200 ease-in-out md:flex',
           sidebarCollapsed ? 'w-16' : 'w-60',
@@ -151,7 +153,7 @@ export function AppShell() {
         >
           <Logo iconOnly={sidebarCollapsed} />
         </div>
-        <ScrollArea className="flex-1 px-2 py-4">
+        <ScrollArea className="flex-1 px-2 py-4" dir={isRtl ? 'rtl' : 'ltr'}>
           <NavContent collapsed={sidebarCollapsed} />
         </ScrollArea>
       </aside>
@@ -165,7 +167,7 @@ export function AppShell() {
               </div>
             </SheetTitle>
           </SheetHeader>
-          <ScrollArea className="flex-1 px-2 pb-4">
+          <ScrollArea className="flex-1 px-2 pb-4" dir={isRtl ? 'rtl' : 'ltr'}>
             <NavContent onNavigate={() => setMobileNavOpen(false)} />
           </ScrollArea>
         </SheetContent>
