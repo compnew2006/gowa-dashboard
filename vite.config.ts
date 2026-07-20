@@ -17,6 +17,9 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
+      host: '0.0.0.0',
+      port: 3000,
+      allowedHosts: true,
       // Same-origin fallback for developing against a gowa server without
       // CORS support: point the UI at http://localhost:5173/gowa instead.
       proxy: {

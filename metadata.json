@@ -1,0 +1,8 @@
+{
+  "name": "Remix: gowa-dashboard",
+  "description": "Imported from GitHub: artxmidea-droid/gowa-dashboard",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

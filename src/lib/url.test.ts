@@ -36,6 +36,11 @@ describe('rerootServerUrl', () => {
       rerootServerUrl('https://api.example.com/wa', 'http://pod:3000/wa/statics/q.png', '/wa'),
     ).toBe('https://api.example.com/wa/statics/q.png')
   })
+
+  it('skips rerouting for WhatsApp/Facebook CDN URLs', () => {
+    const cdnUrl = 'https://pps.whatsapp.net/v/t61.24694-24/181358562_385581386633509_6230178822944778044_n.jpg?oh=123'
+    expect(rerootServerUrl('http://localhost:3000', cdnUrl)).toBe(cdnUrl)
+  })
 })
 
 describe('toWebSocketUrl', () => {

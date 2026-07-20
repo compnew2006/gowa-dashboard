@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, LogOut, RefreshCw, Search, Users } from 'lucide-react'
+import { ChevronRight, LogOut, RefreshCw, Search, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { leaveGroup, listMyGroups, type MyGroup } from '@/api/group'
 import { EmptyState } from '@/components/shared/empty-state'
@@ -69,13 +69,22 @@ export function GroupDirectory({ onSelect }: { onSelect: (group: MyGroup) => voi
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <Search className="text-muted-foreground absolute top-2.5 left-2.5 size-4" />
+          <Search className="text-muted-foreground absolute top-1/2 start-2.5 size-4 -translate-y-1/2" />
           <Input
-            className="pl-8"
+            className="ps-8 pe-8"
             placeholder="Search groups by name or ID"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="text-muted-foreground hover:text-foreground absolute top-1/2 end-2.5 -translate-y-1/2 rounded-sm p-0.5"
+            >
+              <X className="size-4" />
+            </button>
+          )}
         </div>
         <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
           <RefreshCw className={isFetching ? 'size-4 animate-spin' : 'size-4'} />
@@ -156,7 +165,7 @@ export function GroupDirectory({ onSelect }: { onSelect: (group: MyGroup) => voi
         </div>
       )}
 
-      <AlertDialog open={!!leaveTarget} onOpenChange={(open) => !open && setLeaveTarget(null)}>
+      <AlertDialog open={!!leaveTarget} onOpenChange={(open: boolean) => !open && setLeaveTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Leave {leaveTarget?.Name || 'this group'}?</AlertDialogTitle>

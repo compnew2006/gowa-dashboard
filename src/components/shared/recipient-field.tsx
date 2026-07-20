@@ -34,7 +34,7 @@ export function RecipientField({
         <Label>Recipient type</Label>
         <Select
           value={value.type}
-          onValueChange={(type) => onChange({ ...value, type: type as RecipientType })}
+          onValueChange={(type: string) => onChange({ ...value, type: type as RecipientType })}
         >
           <SelectTrigger>
             <SelectValue />

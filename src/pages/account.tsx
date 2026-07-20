@@ -32,6 +32,8 @@ import { MyProfileCard } from '@/features/account/profile-card'
 import { PushnameForm } from '@/features/account/pushname-form'
 import { UserCheckForm } from '@/features/account/user-check-form'
 import { UserInfoForm } from '@/features/account/user-info-form'
+import { DeviceAliasForm } from '@/features/account/device-alias-form'
+import { useTranslation } from '@/stores/i18n'
 
 interface LookupType {
   value: string
@@ -73,6 +75,7 @@ const lookups: LookupType[] = [
 ]
 
 function LookupPanel() {
+  const { t } = useTranslation()
   const [type, setType] = useState('info')
   const active = lookups.find((item) => item.value === type) ?? lookups[0]
 
@@ -81,7 +84,7 @@ function LookupPanel() {
       {/* Lookup picker: vertical list on desktop */}
       <div className="hidden flex-col gap-1 lg:flex">
         <p className="text-muted-foreground px-3 text-[11px] font-medium tracking-wider uppercase">
-          Lookup
+          {t('Lookup')}
         </p>
         {lookups.map(({ value, label, icon: Icon }) => (
           <button
@@ -90,21 +93,21 @@ function LookupPanel() {
             onClick={() => setType(value)}
             aria-pressed={type === value}
             className={cn(
-              'flex items-center gap-2.5 rounded-full px-3 py-2 text-left text-sm font-medium transition-colors',
+              'flex items-center gap-2.5 rounded-full px-3 py-2 text-left text-sm font-medium transition-colors ltr:text-left rtl:text-right',
               type === value
                 ? 'bg-accent text-accent-foreground'
                 : 'text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground',
             )}
           >
-            <Icon className="size-4" />
-            {label}
+            <Icon className="size-4 animate-none" />
+            {t(label)}
           </button>
         ))}
       </div>
 
       {/* Lookup picker: dropdown on mobile */}
       <div className="flex flex-col gap-2 lg:hidden">
-        <Label>Lookup type</Label>
+        <Label>{t('Lookup type')}</Label>
         <Select value={type} onValueChange={setType}>
           <SelectTrigger>
             <SelectValue />
@@ -112,7 +115,7 @@ function LookupPanel() {
           <SelectContent>
             {lookups.map((item) => (
               <SelectItem key={item.value} value={item.value}>
-                {item.label}
+                {t(item.label)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -122,8 +125,8 @@ function LookupPanel() {
       <Card>
         <div key={active.value} className="animate-in fade-in flex flex-col gap-4 duration-200">
           <CardHeader>
-            <CardTitle className="text-base">{active.label}</CardTitle>
-            <CardDescription>{active.description}</CardDescription>
+            <CardTitle className="text-base">{t(active.label)}</CardTitle>
+            <CardDescription>{t(active.description)}</CardDescription>
           </CardHeader>
           <CardContent>{active.form}</CardContent>
         </div>
@@ -133,14 +136,15 @@ function LookupPanel() {
 }
 
 export default function AccountPage() {
+  const { t } = useTranslation()
   const device = useSelectedDevice()
 
   return (
     <PageSurface padded>
       <div className="mx-auto flex max-w-5xl flex-col gap-5">
         <PageHeader
-          title="Account"
-          description="Profile, privacy, contacts and lookups for the selected device."
+          title={t('Account')}
+          description={t('Profile, privacy, contacts and lookups for the selected device.')}
         />
         {!device ? (
           <DeviceGuard />
@@ -149,11 +153,11 @@ export default function AccountPage() {
             <TabsList>
               <TabsTrigger value="profile">
                 <CircleUserRound className="size-4" />
-                My profile
+                {t('My profile')}
               </TabsTrigger>
               <TabsTrigger value="lookup">
                 <ScanSearch className="size-4" />
-                Lookup
+                {t('Lookup')}
               </TabsTrigger>
             </TabsList>
             <TabsContent value="profile" className="flex flex-col gap-4">
@@ -164,17 +168,20 @@ export default function AccountPage() {
                   narrow column. */}
               <MyProfileCard />
               <div className="grid items-start gap-4 sm:grid-cols-2">
-                <ActionCard title="Change avatar" description="Update your own profile picture.">
+                <ActionCard title={t('Change avatar')} description={t('Update your own profile picture.')}>
                   <ChangeAvatarForm />
                 </ActionCard>
-                <ActionCard title="Change push name" description="Update your WhatsApp display name.">
+                <ActionCard title={t('Change push name')} description={t('Update your WhatsApp display name.')}>
                   <PushnameForm />
                 </ActionCard>
-                <ActionCard title="My privacy" description="Your current privacy settings.">
+                <ActionCard title={t('My privacy')} description={t('Your current privacy settings.')}>
                   <PrivacyView />
                 </ActionCard>
-                <ActionCard title="My contacts" description="Contacts synced to this device.">
+                <ActionCard title={t('My contacts')} description={t('Contacts synced to this device.')}>
                   <ContactsView />
+                </ActionCard>
+                <ActionCard title={t('Custom Device Tag Name')} description={t('Set a custom display name for this device tag in chats.')}>
+                  <DeviceAliasForm deviceId={device} />
                 </ActionCard>
               </div>
             </TabsContent>

@@ -58,13 +58,13 @@ export function MessageMedia({ message }: { message: MessageInfo }) {
   const type = message.media_type
 
   if (type === 'image') {
-    return <img src={src} alt={message.filename || 'Image'} className="mt-1 max-h-80 rounded-lg" />
+    return <img src={src} alt={message.filename || 'Image'} className="mt-1 w-full h-auto max-h-80 object-cover rounded-lg" />
   }
 
   if (type === 'video') {
     // No `muted`: the bubble video is interactive (unlike BurstThumbnail's
     // non-interactive thumbnail, which IS muted).
-    return <video src={src} controls className="mt-1 max-h-80 rounded-lg" />
+    return <video src={src} controls className="mt-1 w-full h-auto max-h-80 object-cover rounded-lg" />
   }
 
   if (type === 'audio') {

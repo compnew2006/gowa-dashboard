@@ -54,6 +54,7 @@ import {
   StarForm,
   UpdateForm,
 } from '@/features/message/message-forms'
+import { useTranslation } from '@/stores/i18n'
 
 interface ComposeType {
   value: string
@@ -103,6 +104,7 @@ const composeGroups: { label: string; items: ComposeType[] }[] = [
 const allComposeTypes = composeGroups.flatMap((group) => group.items)
 
 function ComposePanel() {
+  const { t } = useTranslation()
   const [type, setType] = useState('text')
   const active = allComposeTypes.find((item) => item.value === type) ?? allComposeTypes[0]
 
@@ -113,7 +115,7 @@ function ComposePanel() {
         {composeGroups.map((group) => (
           <div key={group.label} className="flex flex-col gap-1">
             <p className="text-muted-foreground px-3 text-[11px] font-medium tracking-wider uppercase">
-              {group.label}
+              {t(group.label)}
             </p>
             {group.items.map(({ value, label, icon: Icon }) => (
               <button
@@ -122,14 +124,14 @@ function ComposePanel() {
                 onClick={() => setType(value)}
                 aria-pressed={type === value}
                 className={cn(
-                  'flex items-center gap-2.5 rounded-full px-3 py-2 text-left text-sm font-medium transition-colors',
+                  'flex items-center gap-2.5 rounded-full px-3 py-2 text-left text-sm font-medium transition-colors ltr:text-left rtl:text-right',
                   type === value
                     ? 'bg-accent text-accent-foreground'
                     : 'text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground',
                 )}
               >
-                <Icon className="size-4" />
-                {label}
+                <Icon className="size-4 animate-none" />
+                {t(label)}
               </button>
             ))}
           </div>
@@ -138,7 +140,7 @@ function ComposePanel() {
 
       {/* Type picker: dropdown on mobile */}
       <div className="flex flex-col gap-2 lg:hidden">
-        <Label>Message type</Label>
+        <Label>{t('Message type')}</Label>
         <Select value={type} onValueChange={setType}>
           <SelectTrigger>
             <SelectValue />
@@ -146,10 +148,10 @@ function ComposePanel() {
           <SelectContent>
             {composeGroups.map((group) => (
               <SelectGroup key={group.label}>
-                <SelectLabel>{group.label}</SelectLabel>
+                <SelectLabel>{t(group.label)}</SelectLabel>
                 {group.items.map((item) => (
                   <SelectItem key={item.value} value={item.value}>
-                    {item.label}
+                    {t(item.label)}
                   </SelectItem>
                 ))}
               </SelectGroup>
@@ -186,6 +188,7 @@ const actions = [
 ]
 
 function ActPanel() {
+  const { t } = useTranslation()
   const [messageId, setMessageId] = useState('')
   const [action, setAction] = useState('react')
   const active = actions.find((item) => item.value === action) ?? actions[0]
@@ -195,7 +198,7 @@ function ActPanel() {
       <CardContent className="flex flex-col gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="act-message-id">Message ID</Label>
+            <Label htmlFor="act-message-id">{t('Message ID')}</Label>
             <Input
               id="act-message-id"
               className="font-mono"
@@ -205,7 +208,7 @@ function ActPanel() {
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label>Action</Label>
+            <Label>{t('Action')}</Label>
             <Select value={action} onValueChange={setAction}>
               <SelectTrigger>
                 <SelectValue />
@@ -213,7 +216,7 @@ function ActPanel() {
               <SelectContent>
                 {actions.map((item) => (
                   <SelectItem key={item.value} value={item.value}>
-                    {item.label}
+                    {t(item.label)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -229,14 +232,15 @@ function ActPanel() {
 }
 
 export default function MessagingPage() {
+  const { t } = useTranslation()
   const device = useSelectedDevice()
 
   return (
     <PageSurface padded>
       <div className="mx-auto flex max-w-5xl flex-col gap-5">
         <PageHeader
-          title="Messaging"
-          description="Pick a recipient once, then compose messages or act on existing ones."
+          title={t('Messaging')}
+          description={t('Pick a recipient once, then compose messages or act on existing ones.')}
         />
         {device === null ? (
           <DeviceGuard />
@@ -247,11 +251,11 @@ export default function MessagingPage() {
               <TabsList>
                 <TabsTrigger value="compose">
                   <Send className="size-4" />
-                  Compose
+                  {t('Compose')}
                 </TabsTrigger>
                 <TabsTrigger value="act">
                   <ListChecks className="size-4" />
-                  Act on a message
+                  {t('Act on a message')}
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="compose">

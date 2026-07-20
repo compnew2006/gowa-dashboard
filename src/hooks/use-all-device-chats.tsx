@@ -19,6 +19,7 @@ interface DeviceSnapshot {
   hasMore: boolean
   status: 'loading' | 'error' | 'ready'
   fetchNext: (() => void) | null
+  isFetchingNextPage: boolean
 }
 
 function sameChats(a: readonly ChatInfo[], b: readonly ChatInfo[]): boolean {
@@ -94,14 +95,16 @@ function DeviceChatsQuery({
     refetchInterval: 5_000,
   })
 
-  const { data, fetchNextPage, hasNextPage, isLoading, isError } = query
+  const { data, fetchNextPage, hasNextPage, isLoading, isError, isFetchingNextPage } = query
 
-  const seen = new Set<string>()
-  const chats = (data?.pages.flatMap((p) => p.data) ?? []).filter((chat) => {
-    if (seen.has(chat.jid)) return false
-    seen.add(chat.jid)
-    return true
-  })
+  const chats = useMemo(() => {
+    const seen = new Set<string>()
+    return (data?.pages.flatMap((p) => p.data) ?? []).filter((chat) => {
+      if (seen.has(chat.jid)) return false
+      seen.add(chat.jid)
+      return true
+    })
+  }, [data])
 
   // Lift the latest snapshot up. The parent's reducer no-ops when content is
   // unchanged (see `sameChats`), so a poll that returns the same data does
@@ -111,11 +114,12 @@ function DeviceChatsQuery({
       chats,
       hasMore: !!hasNextPage,
       status: isLoading ? 'loading' : isError ? 'error' : 'ready',
+      isFetchingNextPage,
       fetchNext: () => {
         void fetchNextPage()
       },
     })
-  }, [report, deviceId, chats, hasNextPage, isLoading, isError, fetchNextPage])
+  }, [report, deviceId, chats, hasNextPage, isLoading, isError, fetchNextPage, isFetchingNextPage])
 
   // Feature 3 (F2.6): feed this device's chats into the unread store on each
   // poll. The bump is keyed on THIS device's id (not the global switcher), so
@@ -128,6 +132,7 @@ function DeviceChatsQuery({
 export interface UseAllDeviceChatsResult {
   rows: MergedChatRow[]
   isLoading: boolean
+  isFetchingNextPage: boolean
   errors: string[]
   hasNextPage: boolean
   fetchNextPage: () => void
@@ -200,6 +205,7 @@ export function useAllDeviceChats({
         cur &&
         cur.status === snapshot.status &&
         cur.hasMore === snapshot.hasMore &&
+        cur.isFetchingNextPage === snapshot.isFetchingNextPage &&
         sameChats(cur.chats, snapshot.chats)
       ) {
         return prev
@@ -234,6 +240,10 @@ export function useAllDeviceChats({
         return !snap || snap.status === 'loading'
       }))
 
+  const isFetchingNextPage = useMemo(() => {
+    return devices.some((d) => snapshots[d.id]?.isFetchingNextPage)
+  }, [devices, snapshots])
+
   const fetchNextPage = useCallback(() => {
     for (const device of devices) {
       const snap = snapshotsRef.current[device.id]
@@ -265,6 +275,7 @@ export function useAllDeviceChats({
   return {
     rows: merged.rows,
     isLoading,
+    isFetchingNextPage,
     errors: merged.errors,
     hasNextPage: merged.hasNextPage,
     fetchNextPage,

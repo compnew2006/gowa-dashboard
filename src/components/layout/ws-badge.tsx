@@ -1,6 +1,7 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useWsStore, type WsStatus } from '@/lib/ws'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/stores/i18n'
 
 const dotStyles: Record<WsStatus, string> = {
   connected: 'bg-live live-dot',
@@ -16,14 +17,16 @@ const labels: Record<WsStatus, string> = {
 
 export function WsBadge() {
   const status = useWsStore((state) => state.status)
+  const { t } = useTranslation()
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="flex items-center px-1" aria-label={labels[status]}>
+        <span className="flex items-center px-1" aria-label={t(labels[status])}>
           <span className={cn('size-2.5 rounded-full', dotStyles[status])} />
         </span>
       </TooltipTrigger>
-      <TooltipContent>{labels[status]}</TooltipContent>
+      <TooltipContent>{t(labels[status])}</TooltipContent>
     </Tooltip>
   )
 }

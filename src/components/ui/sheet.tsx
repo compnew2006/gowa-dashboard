@@ -63,7 +63,7 @@ function SheetContent({
         data-slot="sheet-content"
         className={cn(
           'bg-card text-card-foreground data-open:animate-in data-closed:animate-out fixed z-50 flex flex-col gap-4 shadow-lg transition ease-in-out data-closed:duration-300 data-open:duration-400',
-          sideClasses[side],
+          sideClasses[side as keyof typeof sideClasses],
           className,
         )}
         {...props}

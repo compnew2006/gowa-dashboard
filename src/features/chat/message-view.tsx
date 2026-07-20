@@ -1,6 +1,7 @@
 import {
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type DragEvent as ReactDragEvent,
@@ -19,7 +20,7 @@ import {
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { getChatMessages, type ChatInfo, type MessageInfo } from '@/api/chat'
+import { getChatMessages, type ChatInfo, type MessageInfo, type ReactionInfo } from '@/api/chat'
 import { reactRequest } from '@/api/message'
 import { exec } from '@/api/request'
 import { sendText } from '@/api/send'
@@ -47,7 +48,9 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useActionMutation } from '@/hooks/use-action-mutation'
+import { useTranslation } from '@/stores/i18n'
 import { formatDate, formatFileTimestamp } from '@/lib/format'
 import { jidToPhone } from '@/lib/jid'
 import { tokenizeMessageText } from '@/lib/linkify'
@@ -82,16 +85,6 @@ function topIncomingId(ordered: readonly MessageInfo[], chatJid: string): string
   return null
 }
 
-// Collapse repeated reactions into one pill per emoji with a count suffix.
-// Insertion order is preserved (Map iterates in insertion order), so the first
-// reaction wins display precedence for each emoji.
-function groupReactions(reactions: { emoji: string }[]): Map<string, number> {
-  const counts = new Map<string, number>()
-  for (const reaction of reactions) {
-    counts.set(reaction.emoji, (counts.get(reaction.emoji) ?? 0) + 1)
-  }
-  return counts
-}
 
 function MessageBubble({
   message,
@@ -111,6 +104,7 @@ function MessageBubble({
   const queryClient = useQueryClient()
   const hasMedia = message.media_type && message.media_type !== ''
   const [customEmoji, setCustomEmoji] = useState('')
+  const { language } = useTranslation()
 
   // Reuse the proven reactRequest + exec + useActionMutation trio (the same
   // pattern MessageActionForm uses in message-forms.tsx). `phone` stays
@@ -131,25 +125,39 @@ function MessageBubble({
     reactMutation.mutate({ messageId: message.id, emoji })
   }
 
-  const reactionCounts = message.reactions ? groupReactions(message.reactions) : null
+  const reactionsByEmoji = useMemo(() => {
+    if (!message.reactions) return new Map<string, ReactionInfo[]>()
+    const groups = new Map<string, ReactionInfo[]>()
+    for (const r of message.reactions) {
+      const list = groups.get(r.emoji) ?? []
+      list.push(r)
+      groups.set(r.emoji, list)
+    }
+    return groups
+  }, [message.reactions])
+
+  const isRtl = language === 'ar' || language === 'ur'
+  const alignmentClass = isRtl
+    ? (message.is_from_me ? 'justify-start' : 'justify-end')
+    : (message.is_from_me ? 'justify-end' : 'justify-start')
 
   return (
     <div
       className={cn(
         'group flex items-start gap-1',
-        message.is_from_me ? 'justify-end' : 'justify-start',
+        alignmentClass,
       )}
     >
       <div
         className={cn(
-          'max-w-[75%] rounded-[1.25rem] px-3.5 py-2 text-sm ring-1 transition-colors',
+          'w-[350px] max-w-[85%] rounded-[1.25rem] px-3.5 py-2 text-sm ring-1 transition-colors',
           message.is_from_me
             ? 'bg-bubble-out text-foreground ring-bubble-out/40 rounded-br-md'
             : 'bg-bubble-in text-foreground ring-border rounded-bl-md',
         )}
       >
         {!message.is_from_me && (
-          <p className="text-muted-foreground mb-1 font-mono text-xs">{message.sender_jid}</p>
+          <p className="text-muted-foreground mb-1 font-mono text-xs">{jidToPhone(message.sender_jid)}</p>
         )}
         {message.content && (
           <p className="leading-relaxed break-words whitespace-pre-wrap">
@@ -171,18 +179,31 @@ function MessageBubble({
           </p>
         )}
         {hasMedia && <MessageMedia message={message} />}
-        {reactionCounts && reactionCounts.size > 0 && (
+        {reactionsByEmoji && reactionsByEmoji.size > 0 && (
           <div className="mt-1.5 flex flex-wrap gap-1">
-            {Array.from(reactionCounts, ([emoji, count]) => (
-              <span
-                key={emoji}
-                className="bg-background border-border inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs shadow-xs transition-transform hover:scale-110"
-              >
-                {emoji}
-                {count > 1 ? (
-                  <span className="text-muted-foreground tabular-nums">{count}</span>
-                ) : null}
-              </span>
+            {Array.from(reactionsByEmoji, ([emoji, list]) => (
+              <Tooltip key={emoji}>
+                <TooltipTrigger asChild>
+                  <span
+                    className="bg-background border-border inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs shadow-xs transition-transform hover:scale-110 cursor-help"
+                  >
+                    {emoji}
+                    {list.length > 1 ? (
+                      <span className="text-muted-foreground tabular-nums">{list.length}</span>
+                    ) : null}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="flex flex-col gap-1 p-2 max-w-[200px] text-start bg-popover text-popover-foreground border border-border shadow-md">
+                  <p className="font-semibold text-xs border-b pb-1 mb-1">{emoji} Reactions</p>
+                  <div className="flex flex-col gap-0.5 max-h-32 overflow-y-auto">
+                    {list.map((r, i) => (
+                      <span key={i} className="text-xs font-mono">
+                        {r.is_from_me ? 'Me' : jidToPhone(r.sender_jid)}
+                      </span>
+                    ))}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
             ))}
           </div>
         )}
@@ -290,6 +311,7 @@ export function MessageView({
   deviceId: string
   onBack?: () => void
 }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
@@ -688,11 +710,11 @@ export function MessageView({
             <ArrowLeft className="size-5" />
           </Button>
         )}
-        <ChatAvatar name={chat.name || chat.jid} size="sm" />
+        <ChatAvatar name={chat.name || chat.jid} jid={chat.jid} size="sm" />
         <div className="flex min-w-0 flex-1 flex-col">
-          <h2 className="truncate text-sm leading-tight font-semibold">{chat.name || chat.jid}</h2>
+          <h2 className="truncate text-sm leading-tight font-semibold">{chat.name || jidToPhone(chat.jid)}</h2>
           <p className="text-muted-foreground truncate font-mono text-xs leading-tight">
-            {chat.jid}
+            {jidToPhone(chat.jid)}
           </p>
         </div>
         <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
@@ -710,7 +732,7 @@ export function MessageView({
             value={mediaBurstGapMin}
             onChange={(e) => setMediaBurstGapMin(e.target.valueAsNumber)}
           />
-          <span aria-hidden="true">min gap</span>
+          <span aria-hidden="true">{t('min gap')}</span>
         </div>
         <Button
           variant="ghost"
@@ -730,22 +752,33 @@ export function MessageView({
       </div>
 
       <div className="flex flex-col gap-2.5 border-b px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-        <Input
-          className="bg-muted/40 focus-visible:bg-background border-0 focus-visible:ring-1 sm:max-w-xs"
-          placeholder="Search messages"
-          value={search}
-          onChange={(event) => {
-            setSearch(event.target.value)
-          }}
-        />
+        <div className="relative w-full sm:max-w-xs">
+          <Input
+            className="bg-muted/40 focus-visible:bg-background border-0 focus-visible:ring-1 pe-9 w-full"
+            placeholder={t('Search messages')}
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value)
+            }}
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="text-muted-foreground hover:text-foreground absolute top-1/2 end-3 -translate-y-1/2 rounded-sm p-0.5"
+            >
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
         <label className="text-muted-foreground flex items-center gap-2 text-xs font-medium">
           <Switch
             checked={mediaOnly}
-            onCheckedChange={(value) => {
+            onCheckedChange={(value: boolean) => {
               setMediaOnly(value)
             }}
           />
-          Media only
+          {t('Media only')}
         </label>
       </div>
 
@@ -766,7 +799,7 @@ export function MessageView({
             onClick={() => setBurstOpen(true)}
           >
             <FolderDown className="size-3.5" />
-            {`${burst.files.length} file${burst.files.length === 1 ? '' : 's'} just in`}
+            {`${burst.files.length} file${burst.files.length === 1 ? '' : 's'} ${t('just in')}`}
           </Button>
         )}
         {isLoading ? (
@@ -775,11 +808,9 @@ export function MessageView({
           </div>
         ) : ordered.length === 0 ? (
           <div className="text-muted-foreground flex h-full flex-col items-center justify-center gap-1 p-6 text-center text-sm">
-            <p>No messages stored for this chat yet.</p>
+            <p>{t('No messages stored for this chat yet.')}</p>
             <p className="text-xs">
-              Messages appear here as they are sent or received, and as WhatsApp history sync
-              batches are processed after pairing. Contacts synced from your address book start
-              without message history.
+              {t('Messages appear here as they are sent or received, and as WhatsApp history sync batches are processed after pairing. Contacts synced from your address book start without message history.')}
             </p>
           </div>
         ) : (
@@ -792,7 +823,7 @@ export function MessageView({
             )}
             {!hasNextPage && ordered.length > 0 && (
               <div className="text-muted-foreground py-2 text-center text-xs">
-                Start of conversation
+                {t('Start of conversation')}
               </div>
             )}
             <div className="flex flex-col gap-2">

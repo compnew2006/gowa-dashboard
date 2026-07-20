@@ -5,18 +5,23 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useSelectedDevice } from '@/hooks/use-device-guard'
 import { useDeviceAvatar } from '@/hooks/use-device-avatar'
 import { useDevices } from '@/hooks/use-devices'
+import { useConnection } from '@/stores/connection'
+import { rerootServerUrl } from '@/lib/url'
 
 export function MyProfileCard() {
   const deviceId = useSelectedDevice()
   const { data: devices } = useDevices()
   const device = devices?.find((item) => item.id === deviceId)
   const avatar = useDeviceAvatar(device)
+  const baseUrl = useConnection((state) => state.baseUrl)
+
+  const avatarUrl = avatar.data?.url && baseUrl ? rerootServerUrl(baseUrl, avatar.data.url) : avatar.data?.url
 
   return (
     <Card>
       <CardContent className="flex items-center gap-4">
         <Avatar className="size-16">
-          {avatar.data?.url && <AvatarImage src={avatar.data.url} alt="My avatar" />}
+          {avatarUrl && <AvatarImage src={avatarUrl} alt="My avatar" />}
           <AvatarFallback>
             {avatar.isLoading ? (
               <Skeleton className="size-full rounded-full" />

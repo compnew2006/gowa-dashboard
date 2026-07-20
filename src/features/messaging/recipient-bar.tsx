@@ -46,7 +46,7 @@ export function RecipientBar({ showStatus = true }: { showStatus?: boolean }) {
           <Label>Recipient type</Label>
           <Select
             value={recipient.type}
-            onValueChange={(type) => setRecipient({ ...recipient, type: type as RecipientType })}
+            onValueChange={(type: string) => setRecipient({ ...recipient, type: type as RecipientType })}
           >
             <SelectTrigger className="w-44">
               <SelectValue />

@@ -15,8 +15,10 @@ import {
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Logo } from '@/components/layout/logo'
 import { ThemeToggle } from '@/components/layout/theme-toggle'
+import { LanguageToggle } from '@/components/layout/language-toggle'
 import { UserMenu } from '@/components/layout/user-menu'
 import { WsBadge } from '@/components/layout/ws-badge'
+import { DeviceSwitcher } from '@/components/layout/device-switcher'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -25,6 +27,7 @@ import { PasskeyDialog } from '@/features/session/passkey-dialog'
 import { cn } from '@/lib/utils'
 import { useConnection } from '@/stores/connection'
 import { useSettingsStore } from '@/stores/settings'
+import { useTranslation } from '@/stores/i18n'
 
 const navGroups = [
   {
@@ -61,13 +64,15 @@ function NavContent({
   onNavigate?: () => void
   collapsed?: boolean
 }) {
+  const { t } = useTranslation()
+
   return (
     <nav className={cn('flex flex-col', collapsed ? 'gap-3' : 'gap-4')}>
       {navGroups.map((group) => (
         <div key={group.label} className={cn('flex flex-col', collapsed ? 'gap-0.5' : 'gap-1')}>
           {!collapsed && (
-            <p className="text-muted-foreground px-3 text-[11px] font-medium tracking-wider uppercase">
-              {group.label}
+            <p className="text-muted-foreground px-3 text-[11px] font-medium tracking-wider uppercase text-start">
+              {t(group.label)}
             </p>
           )}
           {collapsed && group !== navGroups[0] && (
@@ -80,10 +85,10 @@ function NavContent({
                 to={to}
                 end={to === '/'}
                 onClick={onNavigate}
-                title={collapsed ? label : undefined}
+                title={collapsed ? t(label) : undefined}
                 className={({ isActive }) =>
                   cn(
-                    'flex items-center gap-2.5 rounded-full px-3 py-2 text-sm font-medium transition-colors',
+                    'flex items-center gap-2.5 rounded-full px-3 py-2 text-sm font-medium transition-colors text-start',
                     isActive
                       ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                       : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground',
@@ -91,13 +96,13 @@ function NavContent({
                 }
               >
                 <Icon className="size-4 shrink-0" />
-                {!collapsed && label}
+                {!collapsed && t(label)}
               </NavLink>
             )
             return collapsed ? (
               <Tooltip key={to}>
                 <TooltipTrigger asChild>{link}</TooltipTrigger>
-                <TooltipContent side="right">{label}</TooltipContent>
+                <TooltipContent side="right">{t(label)}</TooltipContent>
               </Tooltip>
             ) : (
               link
@@ -110,6 +115,8 @@ function NavContent({
 }
 
 export function AppShell() {
+  const { language } = useTranslation()
+  const isRtl = language === 'ar' || language === 'ur'
   const status = useConnection((state) => state.status)
   const location = useLocation()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
@@ -129,10 +136,10 @@ export function AppShell() {
   }
 
   return (
-    <div className="flex min-h-svh">
+    <div className="flex min-h-svh" dir={isRtl ? 'rtl' : 'ltr'}>
       <aside
         className={cn(
-          'bg-sidebar text-sidebar-foreground hidden shrink-0 flex-col border-r transition-[width] duration-200 ease-in-out md:flex',
+          'bg-sidebar text-sidebar-foreground hidden shrink-0 flex-col ltr:border-r rtl:border-l transition-[width] duration-200 ease-in-out md:flex',
           sidebarCollapsed ? 'w-16' : 'w-60',
         )}
       >
@@ -150,7 +157,7 @@ export function AppShell() {
       </aside>
 
       <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-        <SheetContent side="left" className="bg-sidebar w-72 p-0">
+        <SheetContent side={isRtl ? 'right' : 'left'} className="bg-sidebar w-72 p-0" dir={isRtl ? 'rtl' : 'ltr'}>
           <SheetHeader className="border-b">
             <SheetTitle asChild>
               <div>
@@ -191,8 +198,10 @@ export function AppShell() {
             </Button>
             <Logo className="md:hidden" />
           </div>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ms-auto flex items-center gap-2">
+            <DeviceSwitcher />
             <WsBadge />
+            <LanguageToggle />
             <ThemeToggle />
             <UserMenu />
           </div>

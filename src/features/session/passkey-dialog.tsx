@@ -55,7 +55,7 @@ export function PasskeyDialog() {
   }
 
   return (
-    <Dialog open={prompt !== null} onOpenChange={(open) => !open && setPrompt(null)}>
+    <Dialog open={prompt !== null} onOpenChange={(open: boolean) => !open && setPrompt(null)}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Confirm passkey pairing</DialogTitle>

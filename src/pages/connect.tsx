@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useConnection, type TestResult } from '@/stores/connection'
+import { useTranslation } from '@/stores/i18n'
 
 const errorMessages: Record<Exclude<TestResult, 'ok'>, string> = {
   unauthorized: 'The server rejected these credentials (401).',
@@ -15,6 +16,7 @@ const errorMessages: Record<Exclude<TestResult, 'ok'>, string> = {
 }
 
 export default function ConnectPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const status = useConnection((state) => state.status)
   const storedUrl = useConnection((state) => state.baseUrl)
@@ -51,18 +53,18 @@ export default function ConnectPage() {
           <div className="flex flex-col gap-1">
             <Logo className="[&_img]:size-10 [&_span]:text-xl" />
             <p className="text-muted-foreground text-xs">
-              Web dashboard for go-whatsapp-web-multidevice
+              {t('Web dashboard for go-whatsapp-web-multidevice')}
             </p>
           </div>
-          <CardTitle className="mt-1">Connect to your gowa server</CardTitle>
+          <CardTitle className="mt-1">{t('Connect to your gowa server')}</CardTitle>
           <CardDescription>
-            The server URL and optional basic-auth credentials are stored in this browser only.
+            {t('The server URL and optional basic-auth credentials are stored in this browser only.')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form className="flex flex-col gap-4" onSubmit={onSubmit}>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="server-url">Server URL</Label>
+              <Label htmlFor="server-url">{t('Server URL')}</Label>
               <Input
                 id="server-url"
                 placeholder="http://localhost:3000"
@@ -73,7 +75,7 @@ export default function ConnectPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="username">Username</Label>
+                <Label htmlFor="username">{t('Username')}</Label>
                 <Input
                   id="username"
                   autoComplete="username"
@@ -82,7 +84,7 @@ export default function ConnectPage() {
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t('Password')}</Label>
                 <Input
                   id="password"
                   type="password"
@@ -92,20 +94,20 @@ export default function ConnectPage() {
                 />
               </div>
             </div>
-            {error && <p className="text-destructive text-sm">{error}</p>}
+            {error && <p className="text-destructive text-sm">{t(error)}</p>}
             {status === 'unauthorized' && !error && (
               <p className="text-destructive text-sm">
-                The stored credentials were rejected — enter them again.
+                {t('The stored credentials were rejected — enter them again.')}
               </p>
             )}
             {status === 'unreachable' && !error && (
               <p className="text-muted-foreground text-sm">
-                The stored server was unreachable — check it and reconnect.
+                {t('The stored server was unreachable — check it and reconnect.')}
               </p>
             )}
             <Button type="submit" className="w-full" disabled={submitting || !url.trim()}>
               {submitting && <Loader2 className="size-4 animate-spin" />}
-              Connect
+              {t('Connect')}
             </Button>
           </form>
         </CardContent>

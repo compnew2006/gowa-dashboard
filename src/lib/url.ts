@@ -21,6 +21,14 @@ export function rerootServerUrl(baseUrl: string, serverUrl: string, serverBasePa
   let path: string
   try {
     const parsed = new URL(serverUrl)
+    // Don't re-root public CDN URLs (e.g. WhatsApp CDN profile pictures)
+    if (
+      parsed.hostname.includes('whatsapp.net') ||
+      parsed.hostname.includes('wa.net') ||
+      parsed.hostname.includes('fbcdn.net')
+    ) {
+      return serverUrl
+    }
     path = parsed.pathname + parsed.search
   } catch {
     path = serverUrl

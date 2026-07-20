@@ -6,6 +6,7 @@ import { onWsEvent } from '@/lib/events'
 import { wsClient } from '@/lib/ws'
 import { useConnection } from '@/stores/connection'
 import { useDeviceStore } from '@/stores/device'
+import { useI18nStore } from '@/stores/i18n'
 import AccountPage from '@/pages/account'
 import ChatsPage from '@/pages/chats'
 import ConnectPage from '@/pages/connect'
@@ -20,6 +21,9 @@ function useBootstrap() {
 
   useEffect(() => {
     void useConnection.getState().boot()
+    // Bootstrap language and document direction
+    const currentLang = useI18nStore.getState().language
+    useI18nStore.getState().setLanguage(currentLang)
   }, [])
 
   useEffect(() => {

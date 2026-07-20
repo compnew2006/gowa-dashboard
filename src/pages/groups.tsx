@@ -18,6 +18,7 @@ import { GroupDirectory } from '@/features/group/group-list'
 import { InfoFromLinkForm } from '@/features/group/info-from-link-form'
 import { JoinWithLinkForm } from '@/features/group/join-with-link-form'
 import type { MyGroup } from '@/api/group'
+import { useTranslation } from '@/stores/i18n'
 
 function HeaderDialog({
   trigger,
@@ -45,6 +46,7 @@ function HeaderDialog({
 }
 
 export default function GroupsPage() {
+  const { t } = useTranslation()
   const deviceId = useSelectedDevice()
   const [selected, setSelected] = useState<MyGroup | null>(null)
 
@@ -52,19 +54,19 @@ export default function GroupsPage() {
     <PageSurface padded>
       <div className="mx-auto flex max-w-5xl flex-col gap-5">
         <PageHeader
-          title="Groups"
-          description="Groups this device belongs to — select one to manage it."
+          title={t('Groups')}
+          description={t('Groups this device belongs to — select one to manage it.')}
           actions={
             <>
               <HeaderDialog
                 trigger={
                   <Button variant="outline" size="sm">
                     <Eye className="size-4" />
-                    Preview link
+                    {t('Preview link')}
                   </Button>
                 }
-                title="Group info from link"
-                description="Preview a group before joining."
+                title={t('Group info from link')}
+                description={t('Preview a group before joining.')}
               >
                 <InfoFromLinkForm />
               </HeaderDialog>
@@ -72,11 +74,11 @@ export default function GroupsPage() {
                 trigger={
                   <Button variant="outline" size="sm">
                     <Link className="size-4" />
-                    Join with link
+                    {t('Join with link')}
                   </Button>
                 }
-                title="Join with link"
-                description="Join a group from its invite link."
+                title={t('Join with link')}
+                description={t('Join a group from its invite link.')}
               >
                 <JoinWithLinkForm />
               </HeaderDialog>
@@ -84,11 +86,11 @@ export default function GroupsPage() {
                 trigger={
                   <Button size="sm">
                     <Plus className="size-4" />
-                    Create group
+                    {t('Create group')}
                   </Button>
                 }
-                title="Create group"
-                description="Start a new group with participants."
+                title={t('Create group')}
+                description={t('Start a new group with participants.')}
               >
                 <CreateGroupForm />
               </HeaderDialog>

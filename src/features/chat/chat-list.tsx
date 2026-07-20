@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query'
-import { Loader2, Search } from 'lucide-react'
+import { Loader2, Search, X } from 'lucide-react'
 import { listChats, type ChatInfo } from '@/api/chat'
 import { ChatAvatar } from '@/features/chat/chat-avatar'
 import { Button } from '@/components/ui/button'
@@ -15,8 +15,9 @@ import { formatUnread, useUnreadCount } from '@/hooks/use-unread-count'
 import { useUnreadBumpFromChats } from '@/hooks/use-unread-bump'
 import { useChatScroll } from '@/hooks/use-chat-scroll'
 import type { MergedChatRow } from '@/lib/multi-device-merge'
-import { formatDate, isZeroTime } from '@/lib/format'
+import { jidToPhone } from '@/lib/jid'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/stores/i18n'
 
 const PAGE_SIZE = 50
 
@@ -73,7 +74,23 @@ function UnreadBadge({ count }: { count: number }) {
  * multiple owners into one row.
  */
 function DeviceTag({ row }: { row: MergedChatRow }) {
-  const label = row.device.display_name || row.device.id
+  const [alias, setAlias] = useState(() => {
+    return localStorage.getItem(`gowa-ui.device-alias.${row.deviceId}`) || ''
+  })
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setAlias(localStorage.getItem(`gowa-ui.device-alias.${row.deviceId}`) || '')
+    }
+    window.addEventListener('device-alias-updated', handleUpdate)
+    window.addEventListener('storage', handleUpdate)
+    return () => {
+      window.removeEventListener('device-alias-updated', handleUpdate)
+      window.removeEventListener('storage', handleUpdate)
+    }
+  }, [row.deviceId])
+
+  const label = alias || row.deviceId || row.device.id
   const others = row.owningDeviceIds.filter((id) => id !== row.deviceId)
   const title =
     others.length > 0
@@ -83,7 +100,7 @@ function DeviceTag({ row }: { row: MergedChatRow }) {
     <span
       title={title}
       className={cn(
-        'bg-primary/10 text-primary inline-flex h-5 max-w-[8rem] shrink-0 items-center truncate rounded-full px-1.5 font-mono text-xs',
+        'bg-primary/10 text-primary inline-flex h-5 max-w-[16rem] shrink-0 items-center truncate rounded-full px-1.5 font-mono text-xs',
       )}
     >
       {label}
@@ -107,6 +124,7 @@ export function ChatList({
    */
   onSelect: (chat: ChatInfo, deviceId?: string) => void
 }) {
+  const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [hasMedia, setHasMedia] = useState(false)
   const [mode, setMode] = useState<ChatMode>('this')
@@ -173,7 +191,7 @@ export function ChatList({
     ? mergedRows.length
     : (thisDeviceQuery.data?.pages[0]?.pagination.total ?? 0)
   const isLoading = isAllMode ? allDevices.isLoading : thisDeviceQuery.isLoading
-  const isFetchingNextPage = isAllMode ? false : thisDeviceQuery.isFetchingNextPage
+  const isFetchingNextPage = isAllMode ? allDevices.isFetchingNextPage : thisDeviceQuery.isFetchingNextPage
   const hasNextPage = isAllMode ? allDevices.hasNextPage : thisDeviceQuery.hasNextPage
   const fetchNextPage = isAllMode ? allDevices.fetchNextPage : thisDeviceQuery.fetchNextPage
   const errors = isAllMode ? allDevices.errors : []
@@ -215,13 +233,22 @@ export function ChatList({
 
       <div className="flex flex-col gap-2.5 border-b px-3 pt-3 pb-2.5">
         <div className="relative">
-          <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+          <Search className="text-muted-foreground absolute top-1/2 start-3 size-4 -translate-y-1/2" />
           <Input
-            className="bg-muted/50 focus-visible:bg-background border-0 pl-9 focus-visible:ring-1"
-            placeholder="Search chats"
+            className="bg-muted/50 focus-visible:bg-background border-0 ps-9 pe-9 focus-visible:ring-1"
+            placeholder={t('Search chats')}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="text-muted-foreground hover:text-foreground absolute top-1/2 end-3 -translate-y-1/2 rounded-sm p-0.5"
+            >
+              <X className="size-4" />
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-1.5">
           <DeviceSwitcher
@@ -249,7 +276,7 @@ export function ChatList({
                   disabled={allDevicesDisabled}
                   onClick={() => setMode(mode === 'all' ? 'this' : 'all')}
                 >
-                  All devices
+                  {t('All devices')}
                 </Button>
               </span>
             </TooltipTrigger>
@@ -260,7 +287,7 @@ export function ChatList({
         </div>
         <label className="text-muted-foreground flex items-center gap-2 text-xs">
           <Switch checked={hasMedia} onCheckedChange={setHasMedia} />
-          With media only
+          {t('With media only')}
         </label>
       </div>
 
@@ -270,7 +297,7 @@ export function ChatList({
             <Loader2 className="text-muted-foreground size-5 animate-spin" />
           </div>
         ) : visibleChats.length === 0 ? (
-          <p className="text-muted-foreground p-6 text-center text-sm">No chats found</p>
+          <p className="text-muted-foreground p-6 text-center text-sm">{t('No chats found')}</p>
         ) : (
           <>
             <ul className="divide-y">
@@ -299,11 +326,11 @@ export function ChatList({
               </div>
             )}
             {!hasNextPage && visibleChats.length > 0 && (
-              <div className="text-muted-foreground py-3 text-center text-xs">No more chats</div>
+              <div className="text-muted-foreground py-3 text-center text-xs">{t('No more chats')}</div>
             )}
             {errors.length > 0 && (
               <div className="text-muted-foreground py-2 text-center text-xs">
-                {`${errors.length} device${errors.length === 1 ? '' : 's'} failed to load`}
+                {`${errors.length} device${errors.length === 1 ? '' : 's'} ${t('failed to load')}`}
               </div>
             )}
             <div ref={sentinelRef} className="h-1 w-full" aria-hidden="true" />
@@ -313,7 +340,7 @@ export function ChatList({
 
       <div className="text-muted-foreground flex items-center justify-center border-t px-3 py-2 text-xs">
         {visibleChats.length}
-        {isAllMode ? ' chats across devices' : ` of ${total} chats`}
+        {isAllMode ? t('chats across devices') : `${t('of')} ${total} ${t('chats')}`}
       </div>
     </div>
   )
@@ -336,31 +363,36 @@ function ThisDeviceRow({
   onSelect: (chat: ChatInfo, deviceId?: string) => void
 }) {
   const unread = useEffectiveUnread(deviceId, chat)
+  const phone = jidToPhone(chat.jid)
   return (
     <li>
       <button
         type="button"
         onClick={() => onSelect(chat)}
         className={cn(
-          'flex w-full items-center gap-3 px-3 py-3 text-left transition-colors',
+          'flex w-full items-center gap-3 px-3 py-3 text-start transition-colors',
           selected ? 'bg-accent text-accent-foreground' : 'hover:bg-muted/60',
         )}
       >
-        <ChatAvatar name={chat.name || chat.jid} size="md" />
+        <ChatAvatar name={chat.name || chat.jid} jid={chat.jid} size="md" />
         <span className="flex min-w-0 flex-1 flex-col">
-          <span
-            className={cn(
-              'truncate text-sm',
-              selected ? 'text-accent-foreground font-semibold' : 'font-medium',
-            )}
-          >
-            {chat.name || chat.jid}
+          <span className="flex items-center justify-between gap-1.5">
+            <span
+              className={cn(
+                'truncate text-sm',
+                selected ? 'text-accent-foreground font-semibold' : 'font-medium',
+              )}
+            >
+              {chat.name || phone || chat.jid}
+            </span>
           </span>
-          <span className="text-muted-foreground truncate text-xs tabular-nums">
-            {isZeroTime(chat.last_message_time) ? chat.jid : formatDate(chat.last_message_time)}
+          <span className="flex items-center justify-between gap-1.5 mt-0.5">
+            <span className="text-muted-foreground truncate text-xs tabular-nums">
+              {phone}
+            </span>
+            <UnreadBadge count={unread} />
           </span>
         </span>
-        <UnreadBadge count={unread} />
       </button>
     </li>
   )
@@ -381,34 +413,39 @@ function MergedRow({
   // on device B's merged row and clears when that device-scoped conversation
   // is opened (F2.6).
   const unread = useEffectiveUnread(deviceId, chat)
+  const phone = jidToPhone(chat.jid)
   return (
     <li>
       <button
         type="button"
         onClick={() => onSelect(chat, deviceId)}
         className={cn(
-          'flex w-full items-center gap-3 px-3 py-3 text-left transition-colors',
+          'flex w-full items-center gap-3 px-3 py-3 text-start transition-colors',
           selected ? 'bg-accent text-accent-foreground' : 'hover:bg-muted/60',
         )}
       >
-        <ChatAvatar name={chat.name || chat.jid} size="md" />
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="flex items-center gap-1.5">
-            <span
-              className={cn(
-                'truncate text-sm',
-                selected ? 'text-accent-foreground font-semibold' : 'font-medium',
-              )}
-            >
-              {chat.name || chat.jid}
+        <ChatAvatar name={chat.name || chat.jid} jid={chat.jid} size="md" />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="flex items-center justify-between gap-1.5">
+            <span className="flex min-w-0 flex-1 items-center gap-1.5">
+              <span
+                className={cn(
+                  'truncate text-sm',
+                  selected ? 'text-accent-foreground font-semibold' : 'font-medium',
+                )}
+              >
+                {chat.name || phone || chat.jid}
+              </span>
+              <DeviceTag row={row} />
             </span>
-            <DeviceTag row={row} />
           </span>
-          <span className="text-muted-foreground truncate text-xs tabular-nums">
-            {isZeroTime(chat.last_message_time) ? chat.jid : formatDate(chat.last_message_time)}
+          <span className="flex items-center justify-between gap-1.5 mt-0.5">
+            <span className="text-muted-foreground truncate text-xs tabular-nums">
+              {phone}
+            </span>
+            <UnreadBadge count={unread} />
           </span>
         </span>
-        <UnreadBadge count={unread} />
       </button>
     </li>
   )
