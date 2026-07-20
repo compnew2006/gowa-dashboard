@@ -1,4 +1,5 @@
 import type { ApiRequest } from '@/api/request'
+import { toApiError } from '@/lib/api-error'
 import { http, results } from '@/lib/http'
 
 const enc = encodeURIComponent
@@ -55,11 +56,54 @@ export interface DownloadedMedia {
   file_size: number
 }
 
-export function downloadMedia(messageId: string, phone: string, deviceId?: string) {
-  return results<DownloadedMedia>(
-    http.get(`/message/${enc(messageId)}/download`, {
-      params: { phone },
-      headers: deviceId ? { 'X-Device-Id': enc(deviceId) } : undefined,
-    }),
-  )
+/**
+ * Fetch a single message's media metadata (`file_path` + `filename` + size).
+ *
+ * Backend quirk workaround (gowa `/message/<id>/download`): the usecase looks
+ * the message row up via the UNSCOPED `GetMessageByID(id)`, then validates
+ * `message.ChatJID == phone`. In a linked / companion-device setup the same
+ * message id is stored on TWO rows — one per device — and the unscoped lookup
+ * non-deterministically returns either:
+ *   - the row whose `chat_jid` == the conversation JID we passed (the row the
+ *     user is viewing), OR
+ *   - the row whose `chat_jid` == the SENDER's device JID (the row stored by
+ *     the conversation's owning device, viewing the same message from the
+ *     other side).
+ * The attribution check then fails ~50% of the time with the misleading
+ * envelope string `message <id> does not belong to chat <jid>`. This is a
+ * backend bug (the usecase has `GetMessageByIDAndDevice` + `deviceIDFromContext`
+ * available but does not wire them up); we cannot fix gowa from here, but the
+ * two-row structure is symmetric and deterministic, so a single fallback with
+ * `phone = deviceId` covers the other row. One of the two attempts always
+ * matches whichever row SQLite returned.
+ *
+ * The fallback ONLY fires for the specific "does not belong to chat" envelope
+ * string — genuine 404 / 403 / network errors surface immediately, unchanged.
+ */
+export async function downloadMedia(
+  messageId: string,
+  phone: string,
+  deviceId?: string,
+): Promise<DownloadedMedia> {
+  const headers = deviceId ? { 'X-Device-Id': enc(deviceId) } : undefined
+  try {
+    return await results<DownloadedMedia>(
+      http.get(`/message/${enc(messageId)}/download`, { params: { phone }, headers }),
+    )
+  } catch (error) {
+    // Only retry the multi-device attribution race. Bail on any other error
+    // (404, 403, network) so the caller's error handling is unchanged.
+    if (!deviceId || deviceId === phone) throw error
+    const message = toApiError(error).message
+    if (!message.includes('does not belong to chat')) throw error
+    // Retry with `phone = deviceId`. For a linked-device conversation the
+    // owning device's JID is exactly the OTHER row's `chat_jid`, so this
+    // attempt matches the row the backend's unscoped lookup returned.
+    return results<DownloadedMedia>(
+      http.get(`/message/${enc(messageId)}/download`, {
+        params: { phone: deviceId },
+        headers,
+      }),
+    )
+  }
 }
