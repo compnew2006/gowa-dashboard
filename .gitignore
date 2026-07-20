@@ -25,6 +25,6 @@ specs/
 *.njsproj
 *.sln
 *.sw?
-
+/whatsapp_9.0.0_darwin_arm64
 # local planning docs
 docs/superpowers/

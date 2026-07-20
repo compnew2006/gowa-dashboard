@@ -1,0 +1,324 @@
+# AGENTS.md
+
+Workspace instructions for ZCode agents working in `gowa-ui`.
+
+## What this is
+
+Browser dashboard for [go-whatsapp-web-multidevice](https://github.com/aldinokemal/go-whatsapp-web-multidevice) ("gowa"). The whole app compiles to **one self-contained HTML file** (no external requests) and is hosted separately from the gowa backend, which stays a pure API. Read `README.md` before touching build, routing, or release config — the single-file constraint is load-bearing.
+
+Stack: React 19, TypeScript (`target: es2023`, `verbatimModuleSyntax`, `erasableSyntaxOnly`), Vite 8, Tailwind CSS 4, shadcn/ui (`style: radix-nova`, `baseColor: neutral`), TanStack Query 5, Zustand 5, react-router-dom 7 (`HashRouter`), axios, sonner toasts, lucide icons.
+
+## Commands
+
+```bash
+npm run dev          # Vite dev server on :5173; /gowa proxies to VITE_DEFAULT_SERVER_URL (ws included)
+npm run build        # tsc -b && vite build -> emits exactly one file: dist/index.html
+npm run typecheck    # tsc -b  (CI runs this)
+npm run lint         # oxlint  (plugins: react, typescript, oxc; rules-of-hooks=error)
+npm run format       # prettier --write .   |   npm run format:check
+npm run test         # vitest run  (no watch in CI)
+```
+
+Node 22 (see `.github/workflows/ci.yml`). Tests are colocated as `*.test.ts` next to the module under `src/lib` and `src/stores` (e.g. `curl.test.ts`, `url.test.ts`, `jid.test.ts`, `recipient.test.ts`).
+
+## The single-file rule (do not break)
+
+CI asserts `dist/` contains **exactly one file**. To keep it that way:
+
+- **No `import()` / `React.lazy`** — code splitting breaks `vite-plugin-singlefile`.
+- **No CDN scripts, remote fonts, or remote images** — everything is inlined. Fonts come from `@fontsource-variable/*` packages; the logo is a bundled `.webp` (see "Regenerating the logo" in README before touching `src/assets/`).
+- **`HashRouter` only** — the output must survive `file://` and any mount path. Don't switch to `BrowserRouter`.
+- `index.html` is the Vite template and the release template; the favicon is inlined as base64.
+
+## Architecture & layer rules
+
+```
+src/
+  api/        one module per gowa resource (send, message, chat, group, user, devices, newsletter, call, app)
+              Each endpoint exports BOTH a `*Request(payload): ApiRequest` builder AND a `send*()` wrapper.
+  lib/        framework-agnostic helpers (http, ws, url, jid, curl, api-error, backoff, format, events)
+              + *.test.ts. No React, no Zustand imports here (except `lib/http.ts` and `lib/ws.ts`, which read from stores).
+  stores/     Zustand stores: connection, device, recipient. Persisted to localStorage.
+  hooks/      React hooks (use-action-mutation, use-devices, use-app-info, use-device-guard, use-device-avatar).
+  components/
+    ui/       shadcn/ui primitives — managed by `shadcn` CLI, don't hand-edit casually.
+    shared/   cross-feature widgets (curl-dialog, result-panel, recipient-field, page-header...).
+    layout/   app shell, sidebar, device switcher, theme toggle, ws badge, user menu, logo.
+  features/   feature folders (send, message, messaging, chat, group, account, newsletter, call, session, devices).
+              One form/widget per file. Pages compose these. `features/chat/` is the chat viewer
+              (distinct from `pages/messaging.tsx`) and includes `chat-avatar.tsx` (deterministic
+              colored avatar shared by the list and the conversation header).
+  pages/      top-level routes mounted in App.tsx.
+  App.tsx     routes + bootstrap effects (wsClient.sync, WS event -> query invalidation).
+  main.tsx    providers: QueryClient, ThemeProvider (next-themes, class attr), TooltipProvider, HashRouter, Toaster.
+```
+
+### Core Pages & Route Mappings
+
+- **`pages/connect.tsx`**: Login/connection screen using Basic Auth credentials store.
+- **`pages/dashboard.tsx`**: Home dashboard with overall device connection metrics and QR session scanning.
+- **`pages/chats.tsx`**: Conversation interface featuring a full-bleed responsive master-detail layout.
+- **`pages/messaging.tsx`**: Bulk/workspace messaging playground for single-recipient quick sends and bulk target broadcasts.
+- **`pages/groups.tsx`**: Groups dashboard to view, select, and interact with WhatsApp group channels.
+- **`pages/account.tsx`**: User profile details retrieved from the API connection.
+- **`pages/settings.tsx`**: Connection server URLs, credential verification state, and server configuration panel.
+
+**Request flow that every action form follows** (mirror it for new endpoints):
+
+1. `src/api/<resource>.ts` builds an `ApiRequest` (`{ method: 'POST', path, json?, form? }`) via `clean()` for JSON or a `form` object for multipart. Export both `fooRequest()` (builder) and `sendFoo()` (executor).
+2. `exec()` in `api/request.ts` sends via the shared axios instance and unwraps the gowa envelope `{ code, message, results }` (see `lib/http.ts` `results<T>()`).
+3. Forms call `useActionMutation(sendFoo, { successMessage })` — it does the toast-on-success / toast-on-error dance. Don't re-implement mutation toasts.
+4. The same `ApiRequest` is handed to `<FormActions request={...} />` (from `components/shared/curl-dialog.tsx`) so the user can copy the equivalent `curl`. **Keep the request builder and the executor sharing the same `ApiRequest`** — that's what stops the cURL view from drifting from the real call (see `lib/curl.ts`).
+
+**Auth & device headers** are attached by the axios interceptor in `lib/http.ts`, not by callers:
+
+- `Authorization: Basic <base64(user:pass)>` from `useConnection`.
+- `X-Device-Id: <encodeURIComponent(deviceId)>` from `useDeviceStore`.
+- The cURL renderer in `lib/curl.ts` mirrors these headers — if you change one, change the other.
+- A 401 from anywhere flips `useConnection` to `unauthorized`, which routes the user to `/connect`.
+
+**WebSocket** (`lib/ws.ts`): `wsClient.sync()` reconciles the socket against `useConnection` + `useDeviceStore`. Credentials go in the **query string** (`?device_id=&authorization=`) because browsers can't set headers on `ws://`. Reconnect uses `lib/backoff.ts`. Events fan out via the tiny pub/sub in `lib/events.ts` (`onWsEvent` / `emitWsEvent`); `App.tsx` is the only subscriber that mutates query cache.
+
+**Server URL handling** (`lib/url.ts`): `normalizeBaseUrl`, `rerootServerUrl` (re-roots server-built absolute URLs like `qr_link` onto the configured base, stripping `APP_BASE_PATH`), `toWebSocketUrl`, `sameOriginBaseUrl` (zero-config mode when gowa serves the UI itself). Read this file before changing anything that constructs URLs.
+
+### Chat viewer feature notes (`pages/chats.tsx` + `features/chat/*`)
+
+The chat viewer is distinct from the Messaging workspace (`pages/messaging.tsx` + `useRecipientStore`). `pages/chats.tsx` mounts `<MessageView chat={selected} />` inside a responsive master-detail layout and addresses one specific chat. Future agents must not regress these behaviours:
+
+- **Full-bleed master-detail.** `app-shell.tsx` branches on `location.pathname === '/chats'`: `<main>` loses its padding (becomes `flex-1`) and `<Outlet/>` is wrapped in `h-[calc(100svh-3.5rem)]` instead of the centered `max-w-5xl` column every other page uses. `pages/chats.tsx` renders a single `bg-card` surface with `aside` (chat list, `w-full md:w-80 lg:w-96`, `border-r`) + `section` (conversation, `flex-1`) side-by-side. Mobile master-detail: `mobileShowConversation` state hides the aside and shows the section full-width on tap; the `md:hidden` back arrow in `MessageView`'s header (passed as `onBack`) flips it back. **Do not wrap `ChatList` or `MessageView` in padded `<Card>` divs** — that doubled the chrome and overflowed the viewport.
+- **RTL & Internationalization (i18n) Styling Alignment.** The dashboard supports RTL languages (`ar`, `ur`) via the direction layout configuration tracked in the i18n store. When styling components, do not use raw `text-left` or `text-right` unilaterally on text content that needs to support internationalized flow direction. Always utilize `text-start` or `text-end`, or explicitly pair directional utility styles such as `ltr:text-left rtl:text-right` to ensure consistent visual alignment in RTL locales.
+- **Message Search, Debouncing, and Instant Filtering.** To support quick, responsive message searches without overloading the backend or causing lagging input typing states:
+  - Inside `MessageView`, user search query input is debounced via the `useDebounce` hook (with a 300ms delay) before being passed to `useInfiniteQuery`'s `queryKey` and request parameters as `debouncedSearch`.
+  - While deep background API network calls compile or poll, an immediate in-memory synchronous filter (`filteredOrdered`) is evaluated on the reversed message list copy `ordered` to match typing instantly. The interface maps and renders over `filteredOrdered` rather than the raw `ordered` array.
+- **Loading State and Spinner Resilience.** To prevent full-screen list blanking, flicker, and flash when users are typing search terms or toggle filter options:
+  - **In `ChatList`**: The primary full-screen loader spinner is only displayed when `isLoading` is true AND the visible list is empty (`visibleChats.length === 0`).
+  - **In `MessageView`**: The conversation-level loading spinner is only shown when `isLoading` is true AND the filtered message list is empty (`filteredOrdered.length === 0`).
+- **All-Devices Mode Media Download Scoping.** In environments managing multiple connected WhatsApp sessions (the All-Devices Mode), all media export and thumbnail functions (`downloadMedia`, `useMediaExport`, `MessageMedia`, `BurstThumbnail`) must correctly route request scoping to the originating device:
+  - An optional `deviceId?: string` argument is parsed by the hook and query handlers.
+  - When provided, the basic client fetches passing `deviceId` assign it to the `X-Device-Id` header (via standard HTTP Basic interceptor logic), matching standard API request structures so files are compiled correctly per device.
+- **Chat list infinite scroll (`features/chat/chat-list.tsx`).** `useInfiniteQuery` (`PAGE_SIZE = 50`) with `queryKey: ['chats', deviceId, { search, hasMedia }]`, polling via `refetchInterval: deviceId ? 5_000 : false`, `placeholderData: keepPreviousData`. Pages flatten via `data.pages.flatMap((p) => p.data)` and dedupe by `jid` defensively (polling can shift a chat between pages). A plain `<div ref={scrollRef} className="overflow-y-auto">` (NOT `ScrollArea` — it doesn't expose a viewport ref for `IntersectionObserver.root`) holds the list, with a 1px sentinel at the bottom observed with `rootMargin: '0px 0px 200px 0px'` to preload the next page at ~80% scroll. `getPreviousPageParam: () => undefined` (top-down, newest-first; no upward paging). No Prev/Next buttons.
+- **Message ordering — newest at bottom (`features/chat/message-view.tsx`).** Messages load via `useInfiniteQuery` (`PAGE_SIZE = 50`); each page's `data` is newest-first, pages are ordered newest-page-first (page 0 = newest). `const messages = data?.pages.flatMap((p) => p.data) ?? []` flattens newest-first, then `const ordered = [...messages].reverse()` produces the chronological top-to-bottom copy the render loop maps over; the day-separator comparison reads `ordered[index - 1]`. The cached `data.pages` reference is NEVER mutated (flatMap + spread-then-reverse is mandatory). Older pages stream in via upward infinite scroll (see below) — there is no Newer/Older pager.
+- **Upward infinite scroll (older messages).** An `IntersectionObserver` rooted on the scroll container watches a 1px sentinel at the TOP of the content with `rootMargin: '200px 0px 0px 0px'`. The callback is gated by `observerArmedRef` (see "anti-loop" below) plus `hasNextPage && !isFetchingNextPage`, then calls `fetchNextPage({ cancelRefetch: false })`. `getNextPageParam` walks forward by `lastPage.pagination.offset + lastPage.data.length` until that sum reaches `pagination.total`; `getPreviousPageParam: () => undefined`. Newer messages arrive via the 5s poll (`refetchInterval: 5_000`), not backwards paging. The sentinel, a loading spinner (while `isFetchingNextPage`), and a "Start of conversation" line (when `!hasNextPage && ordered.length > 0`) render above the message list. Each message wrapper carries `data-msg-id={message.id}` so the load-older anchor (below) can find it.
+- **Auto-scroll — four coordinated concerns, NOT a single `messages.length` effect.** The message list is a plain `<div ref={scrollRef} className="... overflow-y-auto ...">`, NOT a `ScrollArea` (radix ScrollArea doesn't forward a viewport ref). Scroll behavior is split across refs so that prepending older pages does NOT yank the user:
+  - **`stickToBottomRef`** arms on `chat.jid` change (new chat) and in `sendMutation.onSuccess` (so the invalidation refetch scrolls the just-sent message into view). A `useLayoutEffect([chat.jid, data, isLoading])` performs the instant `scrollRef.current.scrollTop = scrollRef.current.scrollHeight` ONLY when the flag is set, then clears it. **`useLayoutEffect` (not `useEffect`)** is mandatory: it runs after DOM mutation but before paint, so a re-mount with TanStack-cached data sees the fully-laid-out `scrollHeight` and lands at the bottom. Deps use `data` (the query result ref), not `ordered.length`, because cache hydration can hand back a new `data` object while the derived length stays the same. `draft` is deliberately ABSENT from the deps so the scroll doesn't fire on every keystroke.
+  - **`isNearBottomRef`** is updated by an `onScroll` handler (`scrollHeight - scrollTop - clientHeight < 80`). A `useEffect([data, isLoading])` re-arms `stickToBottomRef` after each fetch/refetch (including polls) ONLY when the user was near the bottom, so a poll that arrives while the user is reading history leaves them where they are.
+  - **`observerArmedRef` (anti-loop):** the observer callback short-circuits when this ref is `false`. `fetchNextPage` sets it `false` synchronously before firing; `handleScroll` re-arms it only when `scrollTop > 100` (user has scrolled down away from the top). `useEffect([chat.jid])` re-arms on chat switch. Without this, a prepend pushes the sentinel back into the viewport's top edge and `fetchNextPage` chains forever — 50 → 100 → 150 … in a death loop.
+  - **Load-older anchor (`anchorIdRef`, DOM-node based):** on the `isFetchingNextPage` false→true edge, capture `ordered[0]?.id`. On the true→false edge, look up `scrollRef.current.querySelector('[data-msg-id="…"]')` (via `CSS.escape`) and set `scrollTop = anchorEl.offsetTop - clientTop`. DOM-node anchoring (not `scrollHeight` delta) is mandatory — delta drifts when media loads asynchronously and grows a bubble above the anchor after the restore. If the anchor element vanished during the fetch (rare — message deleted), skip silently.
+  - **Send-success** sets `stickToBottomRef.current = true` before invalidating, so the refetch that grows `ordered.length` triggers the bottom jump regardless of prior scroll position.
+- **Per-bubble Reply + React buttons.** `MessageBubble` accepts `chatJid: string` and `onReply: (m) => void`, both threaded from `MessageView` in the render loop. Reply sets local `replyTarget` state → renders a preview chip between the scroll container and the compose form → threads `reply_message_id: replyTarget?.id || undefined` into `sendText` (`clean()` drops it when empty, so no-target sends are byte-identical to before) → cleared in `onSuccess`. React reuses `reactRequest` + `exec` + `useActionMutation` (the same trio as `features/message/message-forms.tsx`) via a `DropdownMenu` picker (Popover is NOT installed); on success it invalidates `['chat-messages', deviceId, chatJid]`. Reactions render as grouped emoji pills (`Map<string, number>`, count shown when > 1) inside each bubble, never as a joined string.
+
+**Hard invariant:** `phone` is ALWAYS `chat.jid` in this file — for both `sendText` and the react payload. NEVER import `useRecipientStore` / `useRecipientJid` here; the global Messaging-workspace recipient must not leak into the chat viewer (it would silently address replies/reactions to the wrong chat).
+
+**Known data gaps (backend-driven, do NOT try to render these yet):** message delivery/read `status` (✓ / ✓✓ / blue ✓✓) — gowa does not return a `status` field; reply-quote preview inside the bubble — gowa does not return `reply_to_*` fields; per-chat unread count — gowa does not return `unread_count` on `ChatInfo`. All three require backend work in `gowa-cloned/src`.
+
+- `status` and `reply_to_*`: capture receipt events in `event_receipt.go` + persist reply context in `event_message.go`. The reactions block groups `message.reactions` by emoji into a `Map<string, number>` and renders one pill per emoji with the count when > 1; empty reactions render nothing. It will populate once the backend reliably returns `reactions` on the message response.
+- `unread_count`: gowa's `ChatInfo` (in `gowa-cloned/src/domains/chat/chat.go`) does not carry an unread field. The required backend change is to add a field named `UnreadCount` of type `uint32` with the JSON tag `unread_count`, populate it inside the `ListChats` path by counting message-store rows where `is_from_me` is false and the chat's per-chat last-read cursor predates the message timestamp, and expose it on the `GET /chats` response. This requires gowa to track a per-chat last-read cursor, which it does not today. The client-side fallback in place is the persisted Zustand store `src/stores/unread.ts`, keyed by `${deviceId}|${jid}`, fed by the 5s chat-list poll through `src/lib/unread-diff.ts` and `src/hooks/use-unread-bump.ts`. The selector hook `src/hooks/use-unread-count.ts` prefers the server value the moment the field appears, detected with `'unread_count' in chat`, so the badge lights up from the server with no further UI change. The in-conversation divider in `features/chat/message-view.tsx` is similarly client-driven today and clears on visibility or focus return.
+
+## Conventions
+
+- **Path alias**: import via `@/...` (maps to `./src/*`). Configured in `tsconfig.app.json` and `vite.config.ts`.
+- **Prettier**: no semicolons, single quotes, 100 cols, `prettier-plugin-tailwindcss` (Tailwind class sorting is enforced).
+- **TypeScript is strict-ish**: `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`, `verbatimModuleSyntax` (use `import type` for types), `erasableSyntaxOnly` (no TS-only runtime features like enums or parameter properties — use union types / plain objects).
+- **Components**: shadcn/ui in `components/ui` (config in `components.json` — `aliases.utils = @/lib/utils`); `cn()` lives in `lib/utils.ts`. Feature widgets go in `features/*`, shared widgets in `components/shared`.
+- **State**: Zustand. Persisted stores use `persist` + `createJSONStorage(() => localStorage)` and a versioned `name` (e.g. `gowa-ui.connection.v1`). Selectors should be narrow: `useConnection((s) => s.status)`.
+- **Toasts**: `sonner` via `<Toaster richColors position="top-right" />` in `main.tsx`. For action results, go through `useActionMutation`; otherwise `import { toast } from 'sonner'`.
+- **Naming**: files are kebab-case; React components are PascalCase; API functions are camelCase (`sendX` / `xRequest`).
+- **Tests**: plain `*.test.ts` colocated with the module, run with `vitest run`. Prefer unit tests for pure helpers in `lib/` and `stores/`.
+
+## Gotchas
+
+- **`/gowa` dev proxy** (`vite.config.ts`): lets you develop against a gowa server without CORS support by hitting `http://localhost:5173/gowa`. The proxy target is `VITE_DEFAULT_SERVER_URL` (default `http://localhost:3000`, see `.env.example`). Don't assume the UI and gowa are same-origin in dev.
+- **Zero-config mode**: when gowa serves the UI itself, `boot()` probes `sameOriginBaseUrl()` and relies on the browser replaying cached basic-auth on same-origin requests. Don't add an auth header unconditionally in that path.
+- **WebSocket auth is in the query string** — only safe under TLS. Don't "fix" this by moving it to a header; browsers can't.
+- **`rerootServerUrl` exists because gowa builds absolute URLs from the `Host` header**, which is wrong behind proxies. Any new server-returned URL that will be rendered as a link/image probably needs rerooting.
+- **Release asset name is fixed**: every `v*` tag publishes exactly `gowa-ui.html` (+ `.sha256`). The gowa backend fetches `releases/latest` by that exact name and verifies the checksum. Don't rename it (see `.github/workflows/release.yml`).
+- **CI gates**: `typecheck` + `lint` + `build` + the single-file assertion all run on every PR. Run them locally before pushing.
+
+---
+
+# ORCHESTRATOR & SWARM PIPELINE
+
+This project uses a 4-agent swarm: **Planner → Reviewer → Builder → Auditor**. The
+Orchestrator coordinates each phase, judges output, and decides whether to pass forward or loop back.
+Agent definitions live in `agents/` (PLANNER.md, REVIEWER.md, BUILDER.md, AUDITOR.md).
+
+## Project Stack — Auto-Detected
+
+This project is **FRONTEND-ONLY** in scope (the `gowa-ui/` directory itself). The full repo
+contains a Go backend (`src/`) and embedded plain-JS views, but work in this folder is React 19 + TS.
+
+- Frontend modern: **React 19 + TypeScript** in `gowa-ui/`
+- Build tool: **Vite 8** (single-file output via `vite-plugin-singlefile`)
+- Styling: **Tailwind CSS 4** + **shadcn/ui** (`style: radix-nova`, `baseColor: neutral`)
+- State: **Zustand 5** + **TanStack Query 5**
+- Routing: **react-router-dom 7** (`HashRouter` only — single-file constraint)
+- Tests: **vitest** (colocated `*.test.ts`)
+- Backend binary (separate): `whatsapp_9.0.0_darwin_arm64/darwin-arm64` (Go + Fiber) — runs on port 3080
+
+RULE: If it is not detected from real files, it does not exist.
+
+## The Pipeline
+
+```
+Requirement → Planner → Reviewer → Builder → Auditor → Done
+                ↑          |          |          |
+                └──────────┴──────────┴──────────┘
+                     Loop back on REJECT
+```
+
+### Phase 1 — Planner (`agents/PLANNER.md`)
+- Auto-detect real stack and conventions from project files.
+- Read codebase via MCP servers (serena, Socraticode, codebase-memory).
+- Design spec/plan/tasks grounded ONLY in real existing files and symbols.
+- Write them to `specs/<slug>/` as `spec.md`, `plan.md`, `tasks.md`.
+- Must respect and reuse whatever already exists.
+
+**Orchestrator gate**: Three docs exist and reference real files? Stack correctly detected? Scope frontend-only?
+
+### Phase 2 — Reviewer (`agents/REVIEWER.md`)
+- Check reuse-first, DDD layering, migration safety, spec-driven compliance.
+- Return APPROVE or REJECT.
+
+**Orchestrator gate**: If APPROVE → proceed. If REJECT → loop back (max 2 loops).
+
+### Phase 3 — Builder (`agents/BUILDER.md`)
+- Implement via Serena edits (no shell edits on source).
+- Run `npm run typecheck && npm run lint && npm run build && npm run test` from `gowa-ui/`.
+- Hand code + summary to Auditor.
+
+**Orchestrator gate**: Tests green? Serena used? If fail → report and stop.
+
+### Phase 4 — Auditor (`agents/AUDITOR.md`)
+- Run build and tests independently.
+- Check security (XSS, CSRF, auth bypass, secrets exposure).
+- Check test quality (no bloat, no skip, behavior-driven).
+- Return APPROVE or REJECT.
+
+**Orchestrator gate**: If APPROVE → done. If REJECT → loop back to Builder (max 2 loops).
+
+## Local Skills (.agents/skills/)
+
+The following 16 skills are installed locally at `.agents/skills/`. Every agent MUST invoke the
+skills relevant to their phase before starting work. Skills are NOT optional — they are mandatory
+discipline that ensures quality. These skills match the project's actual stack: **React 19 + TypeScript
++ Vite 8 + Tailwind CSS 4 + shadcn/ui + oxlint + vitest**.
+
+| Skill | Path | Used By | When to Invoke |
+|---|---|---|---|
+| `react-best-practices` | `.agents/skills/react-best-practices/SKILL.md` | Builder, Reviewer | Writing, reviewing, or refactoring React components — performance, hooks discipline |
+| `composition-patterns` | `.agents/skills/composition-patterns/SKILL.md` | Planner, Builder | Refactoring components with boolean-prop proliferation, building flexible APIs, compound components |
+| `tailwind-css-patterns` | `.agents/skills/tailwind-css-patterns/SKILL.md` | Builder | Responsive design, layout utilities, flexbox/grid, spacing, typography styling |
+| `shadcn` | `.agents/skills/shadcn/SKILL.md` | Builder | Adding, searching, fixing, debugging, styling, or composing shadcn/ui components |
+| `typescript-advanced-types` | `.agents/skills/typescript-advanced-types/SKILL.md` | Builder, Planner | Generics, conditional types, mapped types, template literals, utility types — for `verbatimModuleSyntax` / `erasableSyntaxOnly` compliance |
+| `vite` | `.agents/skills/vite/SKILL.md` | Builder | Vite config, plugin API, SSR, **Vite 8 Rolldown migration** — touches `vite.config.ts` or `vite-plugin-singlefile` |
+| `oxlint` | `.agents/skills/oxlint/SKILL.md` | Builder, Auditor | Running/configuring oxlint — the project's actual linter (`plugins: react, typescript, oxc`) |
+| `bun` | `.agents/skills/bun/SKILL.md` | Builder (optional) | Building/testing/deploying JS/TS — **note: project uses npm/Node 22, not Bun**. Use only if migrating |
+| `nodejs-backend-patterns` | `.agents/skills/nodejs-backend-patterns/SKILL.md` | Planner | Express/Fastify middleware patterns — **note: gowa backend is Go/Fiber, NOT Node**. Use for any future Node middleware work |
+| `nodejs-best-practices` | `.agents/skills/nodejs-best-practices/SKILL.md` | Planner (optional) | Node.js framework selection, async patterns, security — **note: project is React SPA, backend is Go**. Limited applicability |
+| `bash-defensive-patterns` | `.agents/skills/bash-defensive-patterns/SKILL.md` | Orchestrator, Builder | Writing robust shell scripts, CI/CD pipelines, system utilities — for `.github/workflows/` or build scripts |
+| `vitest` | `.agents/skills/vitest/SKILL.md` | Builder, Auditor | Writing tests, mocking, configuring coverage — the project's actual test runner (`*.test.ts` colocated) |
+| `tailwind-v4-shadcn` | `.agents/skills/tailwind-v4-shadcn/SKILL.md` | Builder, Reviewer | **⚠ Security check pending** — Tailwind v4 + shadcn/ui + Vite + React setup. Use for project initialization or v4 migration conflicts |
+| `frontend-design` | `.agents/skills/frontend-design/SKILL.md` | Builder, Planner | Building distinctive, production-grade UI with high design quality |
+| `accessibility` | `.agents/skills/accessibility/SKILL.md` | Auditor, Builder | WCAG 2.2 AA compliance, a11y audits, screen-reader support, keyboard nav |
+| `seo` | `.agents/skills/seo/SKILL.md` | Builder (optional) | Search engine visibility, meta tags, structured data — **limited applicability: app is a single-file SPA behind HashRouter** |
+
+### Skill Usage Rules
+
+1. **Skills override default behavior** — if a skill says "always do X", you do X.
+2. **User instructions override skills** — if GEMINI.md, AGENTS.md, or direct request conflicts with a skill, follow the user.
+3. **Invoke skills BEFORE any response or action** — even a 1% chance means invoke.
+4. **Re-evaluate every run** — new skills may have been installed.
+5. **Stack-fit first** — prefer `react-best-practices`, `shadcn`, `tailwind-css-patterns`, `typescript-advanced-types`, `vite`, `vitest`, `oxlint` (these match the project's actual stack).
+6. **Process skills first** (brainstorming, debugging, writing-plans) before implementation skills — but note the new skill set is mostly implementation-focused; the universal process skills live in `superpowers/skills/` (see below) if installed.
+
+### Cross-Reference: Process Skills
+
+If installed, the universal process skills in `superpowers/skills/` (brainstorming, writing-plans,
+executing-plans, test-driven-development, systematic-debugging, verification-before-completion,
+receiving-code-review, requesting-code-review) still apply for process discipline. They are
+**complementary** to the stack-specific skills in `.agents/skills/`.
+
+## Universal Rules
+
+1. FRONTEND-ONLY: Never edit anything outside frontend scope (unless explicitly asked to touch backend).
+2. FULLY AGNOSTIC inside frontend: Never hardcode any language, framework, or library.
+3. REUSE FIRST: Always prefer extending existing code over creating new code.
+4. GROUNDED ONLY: No invention. Every decision must be traceable to a real file in the repo.
+5. SKILL-DRIVEN: Every agent must invoke the relevant skills before starting work.
+
+## Output Format
+
+For each phase, produce a short judgment:
+- What the agent was asked to do
+- What skills were invoked
+- What it produced
+- Whether it meets the bar (APPROVE / REJECT)
+- If REJECT: precise reasons and which agent loops back
+
+Never reveal internal deliberation. Never write code (Orchestrator). Never skip a phase. Never skip skills.
+
+---
+
+# GOWA Backend Configuration Reference
+
+The gowa backend binary lives at `whatsapp_9.0.0_darwin_arm64/darwin-arm64`. Its `.env` file
+lives next to it at `whatsapp_9.0.0_darwin_arm64/.env`. Priority order:
+
+1. Command-line flags (highest)
+2. Environment variables
+3. `.env` file (lowest)
+
+## Key Environment Variables
+
+| Variable | Description | Default |
+|---|---|---|
+| `APP_PORT` | Application port | `3000` |
+| `APP_HOST` | Host address to bind | `0.0.0.0` |
+| `APP_DEBUG` | Enable debug logging | `false` |
+| `APP_OS` | OS name (device name in WhatsApp) | `GOWA` |
+| `APP_BASIC_AUTH` | Basic auth credentials (`user:pass,user2:pass2`) | - |
+| `APP_BASE_PATH` | Base path for subpath deployment | - |
+| `APP_TRUSTED_PROXIES` | Trusted proxy IP ranges | - |
+| `APP_CORS_ALLOWED_ORIGINS` | Allowed CORS origins (empty = all) | - |
+| `DB_URI` | Database connection URI | `file:storages/whatsapp.db` |
+| `DB_KEYS_URI` | Optional separate DB for encryption/session keys | - |
+| `CHAT_STORAGE_MAX_OPEN_CONNS` | Max concurrent SQLite connections | `5` |
+| `WHATSAPP_AUTO_REPLY` | Auto-reply message | - |
+| `WHATSAPP_AUTO_MARK_READ` | Auto-mark incoming messages as read | `false` |
+| `WHATSAPP_AUTO_DOWNLOAD_MEDIA` | Auto-download media from incoming messages | `true` |
+| `WHATSAPP_AUTO_REJECT_CALL` | Auto-reject incoming WhatsApp calls | `false` |
+| `WHATSAPP_WEBHOOK` | Webhook URL(s) for events (comma-separated) | - |
+| `WHATSAPP_WEBHOOK_SECRET` | Webhook secret for validation | `secret` |
+| `WHATSAPP_WEBHOOK_INSECURE_SKIP_VERIFY` | Skip TLS verification (insecure) | `false` |
+| `WHATSAPP_WEBHOOK_EVENTS` | Whitelist of events to forward (empty = all) | - |
+| `WHATSAPP_WEBHOOK_IGNORE_JIDS` | JIDs/wildcards to skip when forwarding | - |
+| `WHATSAPP_ACCOUNT_VALIDATION` | Enable account validation | `true` |
+| `WHATSAPP_PRESENCE_ON_CONNECT` | `available` / `unavailable` / `none` | `unavailable` |
+| `WHATSAPP_PROXY` | Outbound proxy for WhatsApp WebSocket | - |
+| `WHATSAPP_PRESENCE_PULSE_ENABLED` | Enable daily presence pulse | `true` |
+| `WHATSAPP_PRESENCE_PULSE_INTERVAL` | Interval between pulses | `24h` |
+| `WHATSAPP_PRESENCE_PULSE_DURATION` | Duration to stay available during pulse | `5m` |
+| `CHATWOOT_ENABLED` | Enable Chatwoot integration | `false` |
+| `APP_UI_ENABLED` | Serve dashboard at `/` | `true` |
+| `APP_UI_AUTO_UPDATE` | Download/refresh dashboard from GitHub | `true` |
+| `APP_UI_REPO` | Repository the updater follows | `aldinokemal/gowa-ui` |
+| `APP_UI_ASSET_NAME` | Release asset filename | `gowa-ui.html` |
+| `APP_UI_UPDATE_INTERVAL` | How often to check `releases/latest` | `3h` |
+| `APP_UI_GITHUB_TOKEN` | Optional token to raise GitHub API rate limit | - |
+| `APP_UI_ASSET_SHA256` | Supply-chain pin: refuse any dashboard whose sha256 differs | - |
+
+## Current Local Configuration
+
+- **Port**: `3080` (set in `whatsapp_9.0.0_darwin_arm64/.env`)
+- **Auth**: `admin:admin123`
+- **DB**: SQLite at `storages/whatsapp.db`
+- **UI**: served from `compnew2006/gowa-dashboard` (our fork)
+
+## Start Command
+
+```bash
+cd whatsapp_9.0.0_darwin_arm64
+./darwin-arm64 rest
+```
+
+The binary reads `.env` automatically. CLI flags override env vars.

@@ -36,6 +36,34 @@ If you approve, say so plainly and name what is strong about the plan, grounded 
 
 You invoke the installed skills that match this review; you do not judge from memory. Use the language or framework skill for the target stack to confirm the design follows that ecosystem's idioms. Use architecture-designer, architecture-guardian, backend-patterns or frontend-patterns, and clean-architecture or hexagonal-architecture where the project follows them, to pressure-test the layering, the contracts, and the blast radius. Use api-design or api-designer to verify REST or RPC contracts, and database-migrations plus the matching persistence skill to verify migrations. Use clean-code-guard in review mode to flag duplication, over-engineering, and the AI-specific failure modes that planning is especially prone to. Re-evaluate this list every run; when a more specific skill has been installed, use it.
 
+## LOCAL SKILLS (.agents/skills/)
+
+The following 16 skills are installed locally in the project at `.agents/skills/`. You MUST invoke them before
+starting any work they cover. Each skill is loaded via its SKILL.md file at the listed path. These skills match
+the project's actual stack: React 19 + TypeScript + Vite 8 + Tailwind CSS 4 + shadcn/ui + oxlint + vitest.
+
+As the Reviewer, your job is verification — use these skills to confirm the Planner's design decisions are sound
+and stack-appropriate.
+
+| Skill | Path | When to Use |
+|---|---|---|
+| `react-best-practices` | `.agents/skills/react-best-practices/SKILL.md` | Verify the Planner's React design follows performance and hooks best practices |
+| `composition-patterns` | `.agents/skills/composition-patterns/SKILL.md` | Verify component composition avoids boolean-prop proliferation |
+| `tailwind-css-patterns` | `.agents/skills/tailwind-css-patterns/SKILL.md` | Verify Tailwind utility choices are idiomatic |
+| `shadcn` | `.agents/skills/shadcn/SKILL.md` | Verify shadcn/ui component choices fit the project's `radix-nova` style |
+| `typescript-advanced-types` | `.agents/skills/typescript-advanced-types/SKILL.md` | Verify types are sound and respect `verbatimModuleSyntax` / `erasableSyntaxOnly` |
+| `vite` | `.agents/skills/vite/SKILL.md` | Verify build config changes respect Vite 8 + single-file constraint |
+| `oxlint` | `.agents/skills/oxlint/SKILL.md` | Verify lint rule changes align with `plugins: react, typescript, oxc` |
+| `vitest` | `.agents/skills/vitest/SKILL.md` | Verify test strategy is sound — colocated `*.test.ts`, behavior-driven |
+| `tailwind-v4-shadcn` | `.agents/skills/tailwind-v4-shadcn/SKILL.md` | **⚠ security check pending** — verify Tailwind v4 + shadcn/ui setup |
+| `frontend-design` | `.agents/skills/frontend-design/SKILL.md` | Verify UI design quality is production-grade |
+| `accessibility` | `.agents/skills/accessibility/SKILL.md` | Verify a11y plan meets WCAG 2.2 AA |
+| `seo` | `.agents/skills/seo/SKILL.md` | Verify SEO considerations (limited applicability) |
+| `bun` | `.agents/skills/bun/SKILL.md` | Reject Bun-based plans unless explicit migration is requested (project uses npm) |
+| `nodejs-backend-patterns` | `.agents/skills/nodejs-backend-patterns/SKILL.md` | Only for future Node backend work (gowa backend is Go) |
+| `nodejs-best-practices` | `.agents/skills/nodejs-best-practices/SKILL.md` | Only for future Node work (limited applicability) |
+| `bash-defensive-patterns` | `.agents/skills/bash-defensive-patterns/SKILL.md` | Verify CI/CD and shell script plans are robust |
+
 ---
 
 ## WHAT YOU NEVER DO

@@ -129,18 +129,43 @@ folder does not yet exist, create it with `mkdir -p specs/<slug>`; if it already
 
     ---
 
-    ## SKILLS YOU MUST USE
+## SKILLS YOU MUST USE
 
-    You invoke the installed skills that match your role; you do not design from memory. Use the language or framework
-    skill for the target stack to ground your design in that ecosystem's idioms and pitfalls. Use the architecture and
-    patterns skills — architecture-designer, architecture-guardian, backend-patterns or frontend-patterns as
-    appropriate, hexagonal-architecture or clean-architecture where the project follows them — to shape the layering,
-    the contracts, and the blast radius. Use api-design or api-designer when the spec defines REST or RPC contracts, and
-    database-migrations plus the matching persistence skill when the spec touches schema. Use
-    architecture-decision-records to record the consequential trade-offs your deliberation resolved, so the Builder, the
-    Reviewer, and the Auditor share your reasoning. Use spec-miner or the relevant spec skill if the project already
-    follows one, to keep your documents consistent with the house format. Re-evaluate this list every run; when a more
-    specific skill has been installed, use it.
+You invoke the installed skills that match your role; you do not design from memory. Use the language or framework
+skill for the target stack to ground your design in that ecosystem's idioms and pitfalls. Use the architecture and
+patterns skills — architecture-designer, architecture-guardian, backend-patterns or frontend-patterns as
+appropriate, hexagonal-architecture or clean-architecture where the project follows them — to shape the layering,
+the contracts, and the blast radius. Use api-design or api-designer when the spec defines REST or RPC contracts, and
+database-migrations plus the matching persistence skill when the spec touches schema. Use
+architecture-decision-records to record the consequential trade-offs your deliberation resolved, so the Builder, the
+Reviewer, and the Auditor share your reasoning. Use spec-miner or the relevant spec skill if the project already
+follows one, to keep your documents consistent with the house format. Re-evaluate this list every run; when a more
+specific skill has been installed, use it.
+
+## LOCAL SKILLS (.agents/skills/)
+
+The following 16 skills are installed locally in the project at `.agents/skills/`. You MUST invoke them before
+starting any work they cover. Each skill is loaded via its SKILL.md file at the listed path. These skills match
+the project's actual stack: React 19 + TypeScript + Vite 8 + Tailwind CSS 4 + shadcn/ui + oxlint + vitest.
+
+| Skill | Path | When to Use |
+|---|---|---|
+| `react-best-practices` | `.agents/skills/react-best-practices/SKILL.md` | When planning React components — performance, hooks discipline |
+| `composition-patterns` | `.agents/skills/composition-patterns/SKILL.md` | When refactoring components with boolean-prop proliferation, designing reusable APIs, compound components |
+| `tailwind-css-patterns` | `.agents/skills/tailwind-css-patterns/SKILL.md` | When planning styling — responsive design, layout, flexbox/grid, spacing, typography |
+| `shadcn` | `.agents/skills/shadcn/SKILL.md` | When planning shadcn/ui component additions or modifications |
+| `typescript-advanced-types` | `.agents/skills/typescript-advanced-types/SKILL.md` | When planning complex types — generics, conditional/mapped types, `verbatimModuleSyntax` / `erasableSyntaxOnly` compliance |
+| `vite` | `.agents/skills/vite/SKILL.md` | When planning build config changes — Vite 8, plugins, `vite-plugin-singlefile` |
+| `oxlint` | `.agents/skills/oxlint/SKILL.md` | When planning lint config changes — plugins, rules |
+| `bun` | `.agents/skills/bun/SKILL.md` | Only if planning a runtime migration to Bun (project currently uses npm/Node 22) |
+| `nodejs-backend-patterns` | `.agents/skills/nodejs-backend-patterns/SKILL.md` | Only for future Node middleware work (gowa backend is Go/Fiber) |
+| `nodejs-best-practices` | `.agents/skills/nodejs-best-practices/SKILL.md` | Only for future Node.js work (limited applicability) |
+| `bash-defensive-patterns` | `.agents/skills/bash-defensive-patterns/SKILL.md` | When planning shell scripts, CI/CD, build utilities |
+| `vitest` | `.agents/skills/vitest/SKILL.md` | When planning tests — mocking, coverage, the project's actual runner |
+| `tailwind-v4-shadcn` | `.agents/skills/tailwind-v4-shadcn/SKILL.md` | **⚠ security check pending** — Tailwind v4 + shadcn/ui + Vite + React setup or migration conflicts |
+| `frontend-design` | `.agents/skills/frontend-design/SKILL.md` | When planning distinctive, production-grade UI with high design quality |
+| `accessibility` | `.agents/skills/accessibility/SKILL.md` | When planning a11y — WCAG 2.2 AA, screen-reader support, keyboard nav |
+| `seo` | `.agents/skills/seo/SKILL.md` | When planning SEO (limited applicability — single-file SPA behind HashRouter) |
 
     ---
 

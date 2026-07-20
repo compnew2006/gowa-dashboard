@@ -32,6 +32,31 @@ Treat documentation as three distinct classes, because they have opposite fates 
 
 Invoke the installed skills each task calls for; you do not build from memory. Use the language or framework skill to keep the code idiomatic. Use test-driven-development when the task adds or changes a business rule — write the failing test first, implement to green. Use test-guard whenever you touch a test file, to keep the tests honest and free of AI-test bloat. Use code-refactorer when the task is a behavior-preserving refactor or when you must restructure to reuse a helper the plan named. Use clean-code-guard as a guard pass on the diff before you hand off — fix violations, do not merely flag them. Use docs-guard whenever your edit touches a public contract, to confirm the living documentation did not drift from the code. Use database-migrations and the matching persistence skill for any migration or query change, and use impeccable only for genuine visible UI or UX work, never as a code lint pass for any language. Use verification-before-completion as the final gate: no claim in your summary without the command output that proves it. Re-evaluate this list every run; when a more specific skill has installed, use it.
 
+## LOCAL SKILLS (.agents/skills/)
+
+The following 16 skills are installed locally in the project at `.agents/skills/`. You MUST invoke them before
+starting any work they cover. Each skill is loaded via its SKILL.md file at the listed path. These skills match
+the project's actual stack: React 19 + TypeScript + Vite 8 + Tailwind CSS 4 + shadcn/ui + oxlint + vitest.
+
+| Skill | Path | When to Use |
+|---|---|---|
+| `react-best-practices` | `.agents/skills/react-best-practices/SKILL.md` | Writing, reviewing, or refactoring React — performance, hooks discipline |
+| `composition-patterns` | `.agents/skills/composition-patterns/SKILL.md` | Refactoring components with boolean-prop proliferation, compound components, render props |
+| `tailwind-css-patterns` | `.agents/skills/tailwind-css-patterns/SKILL.md` | Styling — responsive design, layout, flexbox/grid, spacing, typography |
+| `shadcn` | `.agents/skills/shadcn/SKILL.md` | Adding, searching, fixing, debugging, styling, or composing shadcn/ui components |
+| `typescript-advanced-types` | `.agents/skills/typescript-advanced-types/SKILL.md` | Generics, conditional/mapped types, template literals — for `verbatimModuleSyntax` / `erasableSyntaxOnly` compliance |
+| `vite` | `.agents/skills/vite/SKILL.md` | Vite config, plugin API, **Vite 8 Rolldown migration** — touches `vite.config.ts` or `vite-plugin-singlefile` |
+| `oxlint` | `.agents/skills/oxlint/SKILL.md` | Running/configuring oxlint — the project's actual linter (`plugins: react, typescript, oxc`) |
+| `bun` | `.agents/skills/bun/SKILL.md` | Only if migrating runtime to Bun (project uses npm/Node 22) |
+| `nodejs-backend-patterns` | `.agents/skills/nodejs-backend-patterns/SKILL.md` | Only for future Node middleware work (gowa backend is Go/Fiber) |
+| `nodejs-best-practices` | `.agents/skills/nodejs-best-practices/SKILL.md` | Only for future Node.js work (limited applicability) |
+| `bash-defensive-patterns` | `.agents/skills/bash-defensive-patterns/SKILL.md` | Writing robust shell scripts, CI/CD pipelines, build utilities |
+| `vitest` | `.agents/skills/vitest/SKILL.md` | Writing tests, mocking, coverage — the project's actual test runner (`*.test.ts` colocated) |
+| `tailwind-v4-shadcn` | `.agents/skills/tailwind-v4-shadcn/SKILL.md` | **⚠ security check pending** — Tailwind v4 + shadcn/ui + Vite + React setup or migration conflicts |
+| `frontend-design` | `.agents/skills/frontend-design/SKILL.md` | Building distinctive, production-grade UI with high design quality |
+| `accessibility` | `.agents/skills/accessibility/SKILL.md` | WCAG 2.2 AA compliance, a11y audits, screen-reader support, keyboard nav |
+| `seo` | `.agents/skills/seo/SKILL.md` | Search engine visibility (limited applicability — single-file SPA behind HashRouter) |
+
 ---
 
 ## WHAT YOU NEVER DO
