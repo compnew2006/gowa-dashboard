@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import axios from 'axios'
 import { backoffDelay } from '@/lib/backoff'
 import { emitWsEvent, type WsEvent } from '@/lib/events'
 import { b64encode, toWebSocketUrl } from '@/lib/url'
@@ -52,13 +53,39 @@ class WsClient {
     }
   }
 
-  private reopen(): void {
+  private async getWsTicket(): Promise<string | null> {
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || '/api/v1'
+      const { baseUrl } = useConnection.getState()
+      const targetUrl = baseUrl ? `${baseUrl.replace(/\/+$/, '')}${apiUrl}/auth/ws-ticket` : `${apiUrl}/auth/ws-ticket`
+      const res = await axios.post<{ ticket: string }>(targetUrl, {}, { withCredentials: true, timeout: 5000 })
+      return res.data?.ticket || null
+    } catch {
+      return null
+    }
+  }
+
+  private async reopen(): Promise<void> {
     this.clearTimer()
     this.closeSocket()
     if (!this.desired) return
 
     useWsStore.setState({ status: 'connecting' })
-    const socket = new WebSocket(this.url)
+
+    // Single-use WebSocket ticket acquisition
+    const ticket = await this.getWsTicket()
+    let wsUrl = this.url
+    if (ticket) {
+      try {
+        const parsed = new URL(wsUrl)
+        parsed.searchParams.set('ticket', ticket)
+        wsUrl = parsed.toString()
+      } catch {
+        // Fallback to original URL if parsing fails
+      }
+    }
+
+    const socket = new WebSocket(wsUrl)
     this.socket = socket
 
     socket.onopen = () => {
