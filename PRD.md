@@ -3,6 +3,8 @@
 > Web dashboard for [go-whatsapp-web-multidevice](https://github.com/aldinokemal/go-whatsapp-web-multidevice).
 > Compiles to a single self-contained HTML file. No external requests at runtime.
 
+> **Implementation status (2026-07-22):** the single-file React UI in `src/` is at feature parity (M0–M7 + v1.x shipped — see root `README.md`). The optional JWT-auth proxy described in §1 (Product Overview) now exists as the NestJS service in [`backend/`](./backend); it is runnable and smoke-tested but **not yet wired into the frontend**. See §10 for the per-feature breakdown.
+
 ---
 
 ## 1. Product Overview
@@ -470,3 +472,70 @@ All POST to `/message/:message_id/:action`. Response varies by action.
 | Reply quote preview          | Not rendered                             | gowa must return `reply_to_*` fields on message responses           |
 | Per-chat unread count        | Client-side `useUnreadStore`            | gowa `ChatInfo` needs `unread_count: uint32` field, populated from message store |
 | In-conversation read cursor  | Client-side `unread-diff.ts`            | gowa needs per-chat last-read cursor tracking                       |
+
+---
+
+## 10. Auth-middleware layer (status)
+
+The PRD's Product Overview (§1) describes the dashboard as "fronted by a separate auth middleware that handles user management, roles, permissions, and JWT authentication." That middleware now exists as the optional NestJS service in [`backend/`](./backend). It runs independently on `:4000` and is **not yet wired into the frontend** — the UI still talks to gowa directly. This section records the implementation status so the gap between PRD and shipped code is explicit.
+
+### 10.1 What the backend delivers (live, smoke-tested 2026-07-22)
+
+| PRD Feature | Status in `backend/` | Notes |
+|-------------|----------------------|-------|
+| F01 Login page | ⏳ Not built (UI side) | The backend's `POST /auth/login` exists and returns `{accessToken}` + sets an httpOnly `gowa_refresh` cookie. The UI `/login` page is not built — the existing `/connect` screen is still the first gate. |
+| F02 JWT access token | ✅ Implemented | HS256, 15-min expiry, signed by `JWT_SECRET`. `passport-jwt` strategy validates on every protected route. |
+| F03 JWT refresh token | ✅ Implemented | 7-day rotating refresh, HMAC-SHA256 hashed with `JWT_REFRESH_SECRET` (not plain sha256), family reuse detection that revokes the whole family on a second use. Stored in an httpOnly cookie (not localStorage — diverges from PRD §F03 for XSS safety). |
+| F04 Silent token refresh | ⏳ Backend only | `POST /auth/refresh` rotates the pair. The frontend's axios interceptor at `src/lib/http.ts` does NOT call it yet (intentionally reverted — see `backend/README.md`). |
+| F05 Logout | ✅ Implemented | `POST /auth/logout` revokes the token family + clears the cookie. |
+| F06 Auth Guard (JWT) | ✅ Implemented | Global `JwtAuthGuard` + `WorkspaceGuard`; bypassed via `@Public()` on login/register/refresh/health/webhooks. |
+| F07 401 → Login Redirect | ⏳ Backend only | Backend returns `{code:'unauthorized'}` with HTTP 401. The frontend's existing 401 path (`useConnection.markUnauthorized()` in `lib/http.ts`) still routes to `/connect`, not `/login`. |
+
+### 10.1b CRM coverage (Phase 2 — added 2026-07-22)
+
+| Domain | Endpoint surface | Enforcement | Tests |
+|--------|------------------|-------------|-------|
+| Users (`/api/v1/users`) | `GET /` `GET /:id` `POST /` `PATCH /:id` `POST /:id/role` `DELETE /:id` | `@RequirePermissions('users:manage')` + `@Roles('SuperAdmin','Admin')` on delete | 4 e2e |
+| Roles/permissions | global `RolesGuard` + `PermissionsService.getPermissions(roleId)` resolves at runtime | `@Roles(...)` and `@RequirePermissions(...)` decorators; SuperAdmin (`permissions:['*']`) always passes | 3 e2e (deny + allow) |
+| Contacts (`/api/v1/contacts`) | `GET /` (search+pagination) `GET /:id` `POST /` `PATCH /:id` `DELETE /:id` | read+write vs manage split (Agent can CRUD but not delete) | 6 e2e |
+| Messages (`/api/v1/messages`) | `GET /:jidUri` `GET /by-id/:messageId` `GET /stats` | `@RequirePermissions('chats:read' \| 'audit:read')` | 2 e2e |
+| Audit (`/api/v1/audit`) | `GET /` (filters: userId, action prefix, targetType, date window, pagination) | `@RequirePermissions('audit:read')` (admin-only) | 2 e2e |
+| Audit triggers | `devices`, `campaigns`, `contacts` (I/U/D), `messages_history` (I), `workspace_members` (I/U/D) — all write to `audit_logs` via `SECURITY DEFINER` function | RLS-forced + session-scoped (`app.current_*`) | verified via audit-list tests |
+| Auth-side audit | `auth.login` and `auth.logout` written by `AuthController` via `AuditService.record()` | best-effort (never fails the request) | `auth.login` test asserts the row exists |
+| Proxy-side audit | every non-GET `/api/v1/proxy/**` call records `proxy.<method>` with `{path, method, upstreamStatus, jid}` | best-effort (records after response sent) | implicit |
+
+**Test suite:** `npm test` → 23 tests in `test/api.e2e.ts`, all passing against a live `:4000` server. Covers all 4 controllers, the RolesGuard (deny + allow), the audit triggers, and the unchanged devices vault.
+
+### 10.2 What the backend adds beyond the PRD
+
+These were discovered/designed during implementation:
+
+- **Encrypted device vault** — gowa Basic-Auth credentials are stored AES-256-GCM encrypted in Postgres (`devices.enc_ciphertext/iv/tag`). The browser never sees the gowa password; `/api/v1/proxy/**` decrypts server-side and forwards `Authorization: Basic <decrypted>` to gowa. This is the multi-device, multi-tenant answer to PRD §2.2 (Device Management).
+- **Single-use WebSocket ticket** — `POST /auth/ws-ticket` issues a 30-second Redis-backed ticket that the Socket.IO gateway consumes once, then opens an upstream WS to gowa with `Authorization` on the **handshake header**. This removes the PRD's reliance on putting `?authorization=<base64(creds)>` in the WS URL (the known plaintext-credential caveat).
+- **Row-Level Security** — every tenant table has `ENABLE + FORCE ROW LEVEL SECURITY` with `workspace_id`-scoped policies, plus a `SECURITY DEFINER` audit trigger on `devices` and `campaigns`.
+- **Webhook ingress** — `POST /api/v1/webhooks` verifies HMAC-SHA256 over the raw body with `timingSafeEqual` + a 5-minute replay window, then enqueues to BullMQ. The AI-enrichment worker is feature-flagged off (`AI_INTENT_ENABLED=false`); the broken `gemini-3.6-flash` model was fixed to `gemini-2.0-flash`.
+- **gowa-style error envelope** — the global `HttpExceptionFilter` returns `{code, message, results, path, timestamp}` so the frontend's existing `lib/api-error.ts` parses backend errors uniformly.
+
+### 10.3 What's deliberately NOT done
+
+- **The frontend is NOT routed through `:4000`.** `src/lib/http.ts` and `src/lib/ws.ts` still talk to gowa directly (the working integration). Migration is an opt-in change tracked separately.
+- **No `/login` UI page.** PRD §F01 requires it; the backend endpoint exists but the React form is not built.
+- **No pgvector dependency.** The PRD does not require semantic search; the original `messages_history.embedding vector(1536)` column was dropped so the schema runs on stock Postgres 13+.
+- **No Chatwoot module, no full WebAuthn passkey flow** (still on the roadmap, same as §1 of the root `README.md`).
+
+### 10.4 Verified end-to-end chain
+
+The full proxy chain is live and smoke-tested against a running gowa binary on `:3080`:
+
+```
+POST /api/v1/auth/login {email,password} → 200 {accessToken: <364-char HS256 JWT>}
+GET  /api/v1/devices  (Bearer)           → 200 {results: []}              (empty vault)
+POST /api/v1/devices  (Bearer, body)     → 201 {results: {deviceId: "egypt", ...}}
+GET  /api/v1/proxy/devices (Bearer, X-Device-Id: egypt)
+                                          → 200 {code:"SUCCESS", results: [egypt, Saudi]}
+                                              ↑ forwarded to gowa with decrypted Basic Auth
+```
+
+Security gates verified: wrong password → 401, missing token → 401, missing `X-Device-Id` → 400, unregistered device → 404 (workspace isolation), refresh-token reuse → 403 with family-wide revocation.
+
+See [`backend/README.md`](./backend/README.md) for the full API surface, env vars, and architecture diagram.

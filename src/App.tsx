@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/layout/app-shell'
+import { RequireAuth } from '@/components/auth/require-auth'
 import { onWsEvent } from '@/lib/events'
 import { wsClient } from '@/lib/ws'
 import { useConnection } from '@/stores/connection'
@@ -12,9 +13,14 @@ import ChatsPage from '@/pages/chats'
 import ConnectPage from '@/pages/connect'
 import DashboardPage from '@/pages/dashboard'
 import GroupsPage from '@/pages/groups'
+import LoginPage from '@/pages/login'
 import MessagingPage from '@/pages/messaging'
 import MiscPage from '@/pages/misc'
 import SettingsPage from '@/pages/settings'
+import CrmDashboardPage from '@/pages/crm-dashboard'
+import CrmUsersPage from '@/pages/crm-users'
+import CrmContactsPage from '@/pages/crm-contacts'
+import CrmAuditPage from '@/pages/crm-audit'
 
 function useBootstrap() {
   const queryClient = useQueryClient()
@@ -79,6 +85,7 @@ function App() {
   return (
     <Routes>
       <Route path="/connect" element={<ConnectPage />} />
+      <Route path="/login" element={<LoginPage />} />
       <Route element={<AppShell />}>
         <Route path="/" element={<Navigate to="/chats" replace />} />
         <Route path="/devices" element={<DashboardPage />} />
@@ -90,6 +97,13 @@ function App() {
         <Route path="/account" element={<AccountPage />} />
         <Route path="/misc" element={<MiscPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        {/* CRM routes — require JWT auth, layered on top of the gowa connection */}
+        <Route element={<RequireAuth />}>
+          <Route path="/crm" element={<CrmDashboardPage />} />
+          <Route path="/crm/users" element={<CrmUsersPage />} />
+          <Route path="/crm/contacts" element={<CrmContactsPage />} />
+          <Route path="/crm/audit" element={<CrmAuditPage />} />
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

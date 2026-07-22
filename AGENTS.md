@@ -44,8 +44,10 @@ CI asserts `dist/` contains **exactly one file**. To keep it that way:
 
 ## Architecture & layer rules
 
+There are **two independent layers** in this repo. The single-file React UI in `src/` is the load-bearing one (it ships in every release); the optional CRM proxy in `backend/` is additive and the frontend does not depend on it.
+
 ```
-src/
+src/                      # The single-file React UI (ships as dist/index.html)
   api/        one module per gowa resource (send, message, chat, group, user, devices, newsletter, call, app)
               Each endpoint exports BOTH a `*Request(payload): ApiRequest` builder AND a `send*()` wrapper.
   lib/        framework-agnostic helpers (http, ws, url, jid, curl, api-error, backoff, format, events)
@@ -63,7 +65,40 @@ src/
   pages/      top-level routes mounted in App.tsx.
   App.tsx     routes + bootstrap effects (wsClient.sync, WS event -> query invalidation).
   main.tsx    providers: QueryClient, ThemeProvider (next-themes, class attr), TooltipProvider, HashRouter, Toaster.
+
+backend/                  # OPTIONAL NestJS auth/proxy (independent of src/, runs on :4000)
+              See backend/README.md for the full contract. Talks to gowa upstream on :3080.
+  src/
+    main.ts              bootstrap + raw Express middleware mounting the /api/v1/proxy/** catch-all
+                         (Nest 10's wildcard router is broken under a global prefix — bypass it).
+    app.module.ts        wires DrizzleModule (global DB provider), JwtModule, BullMQ, the global
+                         JwtAuthGuard + ThrottlerGuard + HttpExceptionFilter.
+    db/                  schema.ts (Drizzle; NO pgvector dep — the embedding column was dropped),
+                         rls.sql (idempotent + FORCE ROW LEVEL SECURITY), db.module.ts (the
+                         PostgresJsDatabase provider that every service injects), migrate.ts,
+                         seed.ts (bcrypt rounds=12), tenancy.service.ts.
+    modules/
+      auth/              JWT (HS256, 15m access / 7d rotating refresh w/ family reuse detection),
+                         AES-256-GCM credential vault (crypto.service.ts), Passport-JWT strategy,
+                         /auth/login|register|refresh|logout|ws-ticket|health, ws-ticket.service.ts
+                         (Redis single-use tickets for the WS gateway).
+      devices/           devices.service.ts (encrypted CRUD for the device vault), devices.controller.ts,
+                         proxy.interceptor.ts (legacy, kept for future handlers — the live proxy
+                         is the middleware in main.ts).
+      webhooks/          webhooks.controller.ts (HMAC-SHA256 over RAW body, 5-min replay window,
+                         timingSafeEqual) -> BullMQ -> webhooks.processor.ts (AI enrichment
+                         feature-flagged off by default; model fixed to gemini-2.0-flash).
+      ws/                ws-gateway.ts (Socket.IO) — consumes the single-use ticket, opens an
+                         upstream ws://gowa:3080/ws with Authorization header (no creds in URL).
+    common/              @Public() decorator, @CurrentUser() param decorator, HttpExceptionFilter
+                         (returns gowa-style {code,message,results} envelope), WorkspaceGuard.
 ```
+
+**Hard separation rules:**
+
+- The frontend (`src/`) MUST NOT import from `backend/`. They are separate build targets with separate `tsconfig`s and separate `package.json`s. The frontend is a browser bundle; the backend is a Node service.
+- The frontend talks to gowa directly today (Basic Auth in the axios interceptor at `lib/http.ts`, query-string auth on the WS in `lib/ws.ts`). Re-routing it through `:4000` is an opt-in migration that has NOT happened yet — do not do it casually.
+- The backend is not part of CI's single-file assertion. CI only builds `src/` into `dist/index.html`. The backend has its own `npm run typecheck` (`npx tsc --noEmit` inside `backend/`).
 
 ### Core Pages & Route Mappings
 
@@ -149,3 +184,4 @@ The chat viewer is distinct from the Messaging workspace (`pages/messaging.tsx` 
 - **`rerootServerUrl` exists because gowa builds absolute URLs from the `Host` header**, which is wrong behind proxies. Any new server-returned URL that will be rendered as a link/image probably needs rerooting.
 - **Release asset name is fixed**: every `v*` tag publishes exactly `gowa-ui.html` (+ `.sha256`). The gowa backend fetches `releases/latest` by that exact name and verifies the checksum. Don't rename it (see `.github/workflows/release.yml`).
 - **CI gates**: `typecheck` + `lint` + `build` + the single-file assertion all run on every PR. Run them locally before pushing.
+- **`backend/` is a runnable NestJS proxy (independent of the frontend).** It boots on `:4000` with its own JWT auth, encrypted device vault, and a `/api/v1/proxy/**` passthrough to the gowa binary. See `backend/README.md` for the full quick-start. **The gowa-ui frontend still talks to gowa directly** via the axios interceptor in `lib/http.ts` and the query-string auth in `lib/ws.ts` — that integration is the load-bearing one for the running app. Do NOT re-route the frontend through `/api/v1/*` until you explicitly decide to migrate it; the backend is additive and the two can coexist.

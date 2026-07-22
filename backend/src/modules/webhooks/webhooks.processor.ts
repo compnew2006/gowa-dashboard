@@ -1,190 +1,179 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Worker, Job } from 'bullmq'; // High speed background worker
-import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { eq } from 'drizzle-orm';
-import { messagesHistory, contacts } from '../../db/schema';
-import { GoogleGenAI, Type } from '@google/genai';
-import Redis from 'ioredis';
+import { Injectable, OnModuleInit, Logger, Inject } from '@nestjs/common'
+import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq'
+import { InjectQueue } from '@nestjs/bullmq'
+import { Job, Queue } from 'bullmq'
+import { eq } from 'drizzle-orm'
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
+import Redis from 'ioredis'
+import { ConfigService } from '@nestjs/config'
+import { messagesHistory, contacts } from '../../db/schema'
+import { DRIZZLE_DB } from '../../db/db.module'
+import { WEBHOOK_QUEUE } from './constants'
+
+interface GowaWebhookPayload {
+  event: string
+  device_id?: string
+  payload?: {
+    message?: { id?: string; jid?: string; text?: string; type?: string; from_me?: boolean }
+    [k: string]: unknown
+  }
+  [k: string]: unknown
+}
 
 @Injectable()
-export class WebhooksProcessor {
-  private readonly logger = new Logger(WebhooksProcessor.name);
-  private readonly ai: GoogleGenAI;
-  private readonly redis: Redis;
-  private readonly dlqQueue: any; // Dead Letter Queue representation
+@Processor(WEBHOOK_QUEUE, { concurrency: 4 })
+export class WebhooksProcessor extends WorkerHost implements OnModuleInit {
+  private readonly logger = new Logger(WebhooksProcessor.name)
+  private readonly dlqRedis: Redis
+  private readonly aiEnabled: boolean
 
-  constructor(private readonly db: PostgresJsDatabase<any>) {
-    // Initialise Gemini SDK with strict User-Agent telemetry headers
-    this.ai = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY || 'mock-api-key',
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        }
-      }
-    });
+  constructor(
+    @Inject(DRIZZLE_DB) private readonly db: PostgresJsDatabase<typeof import('../../db/schema')>,
+    @InjectQueue(WEBHOOK_QUEUE) private readonly dlqQueue: Queue,
+    private readonly config: ConfigService,
+  ) {
+    super()
+    this.dlqRedis = new Redis(config.get<string>('REDIS_URL') || 'redis://localhost:6379', {
+      maxRetriesPerRequest: 3,
+    })
 
-    this.redis = new Redis(process.env.REDIS_URI || 'redis://localhost:6379');
-
-    // Instantiate high-speed Worker to process 'gowa-webhooks'
-    new Worker('gowa-webhooks', async (job) => {
-      await this.processJob(job);
-    }, {
-      connection: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: Number(process.env.REDIS_PORT) || 6379,
-      }
-    });
+    // Only enable AI enrichment when explicitly opted in AND an API key exists.
+    const wantAi = config.get<string>('AI_INTENT_ENABLED') === 'true'
+    const hasKey = !!config.get<string>('GEMINI_API_KEY')
+    this.aiEnabled = wantAi && hasKey
+    if (wantAi && !hasKey) {
+      this.logger.warn('AI_INTENT_ENABLED=true but GEMINI_API_KEY is unset. Disabling AI path.')
+    }
   }
 
-  /**
-   * Helper to strip PII (Personal Identifiable Information) from text content
-   * to guarantee privacy compliance before sending text context to AI processing.
-   */
-  private scrubPII(text: string): string {
-    if (!text) return '';
-    let sanitized = text;
-
-    // Mask Credit Card Numbers (Luhn-like patterns)
-    sanitized = sanitized.replace(/\b(?:\d[ -]*?){13,16}\b/g, '[CREDIT_CARD_REDACTED]');
-
-    // Mask Emails
-    sanitized = sanitized.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, '[EMAIL_REDACTED]');
-
-    // Mask Phone Numbers (simple international & local patterns)
-    sanitized = sanitized.replace(/\b(?:\+?\d{1,3}[- ]?)?\(?\d{3}\)?[- ]?\d{3}[- ]?\d{4}\b/g, '[PHONE_REDACTED]');
-
-    return sanitized;
+  onModuleInit(): void {
+    this.logger.log(`Webhook processor online (AI intent: ${this.aiEnabled ? 'ON' : 'OFF'}).`)
   }
 
-  /**
-   * Main background job processor. Runs in isolated context under BullMQ.
-   */
-  async processJob(job: Job): Promise<void> {
-    const { payload, receivedAt } = job.data;
-    this.logger.log(`Processing webhook job ${job.id}...`);
+  async process(job: Job): Promise<void> {
+    const data = job.data as { payload: GowaWebhookPayload; receivedAt: number }
+    const payload = data.payload
+    if (!payload || typeof payload !== 'object') {
+      throw new Error('Webhook payload is not an object.')
+    }
 
-    try {
-      // Structure of gowa webhook message payload:
-      // { workspaceId, deviceId, messageId, jid, direction, text, type }
-      const workspaceId = payload.workspaceId || 'default-ws';
-      const deviceId = payload.deviceId || 'default-device';
-      const messageId = payload.messageId || `msg-${Date.now()}`;
-      const jid = payload.jid;
-      const direction = payload.direction; // 'INBOUND' | 'OUTBOUND'
-      const rawText = payload.text || '';
-      const messageType = payload.type || 'TEXT';
+    const event = payload.event || 'unknown'
+    const deviceId = payload.device_id || 'unknown'
+    const message = payload.payload?.message
+    const messageId = message?.id || `msg-${Date.now()}`
+    const jid = message?.jid || ''
+    const text = message?.text || ''
+    const type = message?.type || 'TEXT'
+    const direction = message?.from_me ? 'OUTBOUND' : 'INBOUND'
 
-      if (!jid) {
-        throw new Error('Message payload JID is empty. Unable to index.');
-      }
+    if (!jid) {
+      this.logger.debug(`Skip ${event}: no jid in payload.`)
+      return
+    }
 
-      // 1. Safe PII scrubbing for DB summaries and safety boundaries
-      const contentSummary = this.scrubPII(rawText);
+    const contentSummary = this.scrubPII(text)
 
-      let intent = 'UNKNOWN';
-      let confidence = 0.0;
-      let sentiment = 'NEUTRAL';
-
-      // 2. Query Gemini AI for intent parsing if it's an INBOUND user message
-      if (direction === 'INBOUND' && rawText && process.env.GEMINI_API_KEY) {
-        try {
-          const response = await this.ai.models.generateContent({
-            model: 'gemini-3.6-flash',
-            contents: `Analyze the following customer WhatsApp message and extract the primary intent, sentiment, and confidence level. Message: "${contentSummary}"`,
-            config: {
-              responseMimeType: 'application/json',
-              responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                  intent: { 
-                    type: Type.STRING, 
-                    description: 'E.g., BILLING, SUPPORT, GREETING, SALES, CANCEL' 
-                  },
-                  confidence: { 
-                    type: Type.NUMBER, 
-                    description: 'Score from 0.0 to 1.0' 
-                  },
-                  sentiment: { 
-                    type: Type.STRING, 
-                    description: 'POSITIVE, NEUTRAL, NEGATIVE' 
-                  },
-                },
-                required: ['intent', 'confidence', 'sentiment']
-              }
-            }
-          });
-
-          if (response.text) {
-            const parsed = JSON.parse(response.text.trim());
-            intent = parsed.intent;
-            confidence = parsed.confidence;
-            sentiment = parsed.sentiment;
-          }
-        } catch (aiErr: any) {
-          this.logger.error(`AI Intent Parsing Failed: ${aiErr.message}. Falling back to default values.`);
-        }
-      }
-
-      // 3. Persist the message record into the historic message ledger
-      await this.db.insert(messagesHistory).values({
-        workspaceId,
+    // Persist to the message ledger (idempotent on message_id via unique index).
+    await this.db
+      .insert(messagesHistory)
+      .values({
+        workspaceId: '00000000-0000-0000-0000-000000000000' as any, // see note
         messageId,
         jid,
-        deviceId,
+        deviceId: deviceId as any, // device_id column is uuid FK; relax for raw ingest
         direction,
-        messageType,
+        messageType: type,
         status: 'RECEIVED',
         contentSummary,
-        createdAt: new Date(receivedAt),
-      });
+        createdAt: new Date(data.receivedAt),
+      })
+      .onConflictDoNothing({ target: messagesHistory.messageId })
 
-      // 4. Update the contact CRM tag dynamically based on extracted intent
-      if (direction === 'INBOUND' && intent !== 'UNKNOWN' && confidence > 0.7) {
-        // Find existing contact
-        const [contact] = await this.db
-          .select()
-          .from(contacts)
-          .where(eq(contacts.jid, jid));
-
-        if (contact) {
-          await this.db
-            .update(contacts)
-            .set({
-              notes: `[AI Classification]: Intent: ${intent} (${sentiment}) Confidence: ${Math.round(confidence * 100)}% on ${new Date().toISOString()}`,
-              updatedAt: new Date()
-            })
-            .where(eq(contacts.id, contact.id));
-        }
-      }
-
-    } catch (err: any) {
-      this.logger.error(`Job ${job.id} failed. Attempt: ${job.attemptsMade}. Error: ${err.message}`);
-      
-      // If job has exceeded all attempts, route to Dead Letter Queue (DLQ) for auditing
-      if (job.attemptsMade >= 5) {
-        this.logger.warn(`Job ${job.id} exceeded maximum retries. Route to DLQ.`);
-        await this.routeToDLQ(job, err);
-      }
-      
-      throw err; // Fail-fast to trigger BullMQ's automatic exponential retry
+    // AI enrichment is OPT-IN and only attempted for inbound text messages.
+    if (this.aiEnabled && direction === 'INBOUND' && text) {
+      await this.enrichWithIntent(jid, contentSummary)
     }
   }
 
   /**
-   * Dead Letter Queue router for unrecoverable errors.
+   * NOTE: this processor is intentionally light on tenancy binding. The
+   * `workspaceId` and `deviceId` here are placeholders because gowa's webhook
+   * payload does not carry our internal workspace/device UUIDs — it carries
+   * the gowa device JID. A future enhancement maps JID -> workspace/device.
+   * For now the message is stored as raw telemetry for audit/debugging only.
    */
-  private async routeToDLQ(job: Job, error: Error): Promise<void> {
-    const dlqKey = 'dlq:webhooks:failed';
-    const failedPayload = {
-      jobId: job.id,
-      data: job.data,
-      failedAt: new Date(),
-      errorName: error.name,
-      errorMessage: error.message,
-      stack: error.stack,
-    };
-    // Push failed payloads into redis failure list for human resolution
-    await this.redis.lpush(dlqKey, JSON.stringify(failedPayload));
+
+  private async enrichWithIntent(jid: string, text: string): Promise<void> {
+    // Lazy-load GoogleGenAI only when actually invoked.
+    try {
+      const { GoogleGenAI, Type } = await import('@google/genai')
+      const apiKey = this.config.get<string>('GEMINI_API_KEY')
+      if (!apiKey) return
+      const ai = new GoogleGenAI({ apiKey })
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.0-flash', // FIXED: the scaffold used 'gemini-3.6-flash' which does not exist
+        contents: `Classify this WhatsApp message. Reply JSON with intent, confidence (0..1), sentiment. Message: "${text}"`,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              intent: { type: Type.STRING },
+              confidence: { type: Type.NUMBER },
+              sentiment: { type: Type.STRING },
+            },
+            required: ['intent', 'confidence', 'sentiment'],
+          },
+        },
+      })
+      if (response.text) {
+        const parsed = JSON.parse(response.text) as { intent: string; confidence: number; sentiment: string }
+        if (parsed.confidence > 0.7) {
+          const [contact] = await this.db.select().from(contacts).where(eq(contacts.jid, jid))
+          if (contact) {
+            await this.db
+              .update(contacts)
+              .set({
+                notes: `[AI ${new Date().toISOString()}] intent=${parsed.intent} (${parsed.sentiment}) @${Math.round(parsed.confidence * 100)}%`,
+                updatedAt: new Date(),
+              })
+              .where(eq(contacts.id, contact.id))
+          }
+        }
+      }
+    } catch (err) {
+      this.logger.warn(`AI enrichment failed (continuing): ${(err as Error).message}`)
+    }
+  }
+
+  private scrubPII(text: string): string {
+    if (!text) return ''
+    let out = text
+    out = out.replace(/\b(?:\d[ -]*?){13,16}\b/g, '[CREDIT_CARD_REDACTED]')
+    out = out.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, '[EMAIL_REDACTED]')
+    out = out.replace(/\b(?:\+?\d{1,3}[- ]?)?\(?\d{3}\)?[- ]?\d{3}[- ]?\d{4}\b/g, '[PHONE_REDACTED]')
+    return out
+  }
+
+  @OnWorkerEvent('failed')
+  onFailed(job: Job | undefined, err: Error): void {
+    if (!job) return
+    this.logger.error(`Job ${job.id} failed (attempts=${job.attemptsMade}): ${err.message}`)
+    if (job.attemptsMade >= (job.opts.attempts ?? 1)) {
+      this.routeToDLQ(job, err).catch(() => void 0)
+    }
+  }
+
+  private async routeToDLQ(job: Job, err: Error): Promise<void> {
+    await this.dlqRedis.lpush(
+      'dlq:webhooks:failed',
+      JSON.stringify({
+        jobId: job.id,
+        data: job.data,
+        failedAt: new Date().toISOString(),
+        error: { name: err.name, message: err.message, stack: err.stack },
+      }),
+    )
+    this.logger.warn(`Job ${job.id} routed to DLQ.`)
   }
 }

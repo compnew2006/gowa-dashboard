@@ -85,3 +85,32 @@ Every `v*` tag publishes exactly one asset named **`gowa-ui.html`** (plus a `.sh
 - [x] **collapsible sidebar** — the desktop sidebar can be collapsed to a `w-16` icon rail (and expanded back to `w-60`) from a toggle button in the top bar; the choice persists in `useSettingsStore.sidebarCollapsed`. Below `md` the shell still uses the left `Sheet` drawer (the collapse flag is ignored on mobile). Collapsed nav items show a right-side tooltip with the label; the `Logo` switches to its icon mark in the rail.
 
 Still to do: Chatwoot config module, full WebAuthn passkey flow.
+
+---
+
+## Optional CRM backend (`backend/`)
+
+The dashboard ships as a single HTML file that talks to gowa directly. For multi-user deployments (agents, roles, audit), an **optional NestJS auth/proxy layer** lives in [`backend/`](./backend). It runs on `:4000`, adds JWT auth + an encrypted device-vault + a transparent reverse-proxy to gowa, and is **independent of the frontend** — the two can coexist while you migrate.
+
+```
+Browser ──Bearer JWT──▶ NestJS :4000 ──Basic Auth──▶ gowa :3080
+                        /auth/*      /devices/*     /proxy/**
+                        (JWT issue)  (vault CRUD)   (passthrough)
+```
+
+**Quick start** (gowa must already be running on `:3080`):
+
+```bash
+cd backend
+cp .env.example .env
+# generate secrets: openssl rand -hex 32 (JWT_SECRET, JWT_REFRESH_SECRET)
+#                 openssl rand -base64 32 (ENCRYPTION_MASTER_KEY)
+npm install && npm run migrate && npm run seed
+npm run start:dev    # http://127.0.0.1:4000/api/v1
+```
+
+Default admin: `admin@gowa-crm.local` / `ChangeMe!2026` (override via `DEFAULT_ADMIN_*` env).
+
+**Verified:** real JWT login (HS256), encrypted device vault (AES-256-GCM, password never plaintext at rest), `/api/v1/proxy/devices` returns gowa's real device list, RLS forced on all tenant tables, wrong-password/no-token/unregistered-device all blocked. Full details + API surface in [`backend/README.md`](./backend/README.md).
+
+> **The frontend is NOT wired to this backend yet.** It still talks to gowa directly via `src/lib/http.ts` + `src/lib/ws.ts`. Migrating it to `:4000` is a separate, opt-in change.

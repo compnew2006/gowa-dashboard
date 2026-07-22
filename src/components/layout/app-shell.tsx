@@ -11,6 +11,9 @@ import {
   UserRound,
   Users,
   Wrench,
+  ShieldCheck,
+  ScrollText,
+  Contact,
 } from 'lucide-react'
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Logo } from '@/components/layout/logo'
@@ -53,6 +56,15 @@ const navGroups = [
     items: [
       { to: '/misc', label: 'Channels & Calls', icon: Wrench },
       { to: '/settings', label: 'Settings', icon: Settings },
+    ],
+  },
+  {
+    label: 'CRM',
+    items: [
+      { to: '/crm', label: 'CRM Dashboard', icon: ShieldCheck },
+      { to: '/crm/contacts', label: 'Contacts', icon: Contact },
+      { to: '/crm/users', label: 'Users & Roles', icon: Users },
+      { to: '/crm/audit', label: 'Audit Log', icon: ScrollText },
     ],
   },
 ]

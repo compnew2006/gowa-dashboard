@@ -1,74 +1,31 @@
-import { 
-  Injectable, 
-  NestInterceptor, 
-  ExecutionContext, 
-  CallHandler, 
-  UnauthorizedException, 
-  BadRequestException 
-} from '@nestjs/common';
-import { Observable } from 'rxjs';
-import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { eq, and } from 'drizzle-orm';
-import { devices } from '../../db/schema';
-import { CryptoService } from '../auth/crypto.service';
+import { Injectable, NestInterceptor, ExecutionContext, CallHandler, BadRequestException, UnauthorizedException } from '@nestjs/common'
+import { Observable } from 'rxjs'
+import { DevicesService } from './devices.service'
+import { CryptoService } from '../auth/crypto.service'
 
+/**
+ * Optional interceptor that pre-resolves device credentials and stashes them
+ * on the request so handlers can avoid a second lookup.
+ *
+ * The gowa-proxy controller does its own resolution inline (so it owns the
+ * exact failure modes), but this interceptor is kept available for any future
+ * controller that wants pre-resolved creds on `request.resolvedDevice`.
+ */
 @Injectable()
 export class ProxyInterceptor implements NestInterceptor {
-  constructor(
-    private readonly db: PostgresJsDatabase<any>,
-    private readonly cryptoService: CryptoService
-  ) {}
+  constructor(private readonly devices: DevicesService, private readonly crypto: CryptoService) {}
 
-  /**
-   * Intercepts standard outgoing requests aimed at the gowa backend.
-   * Dynamically appends decapped Basic Auth credentials and verifies device ownership.
-   */
-  async intercept(context: ExecutionContext, next: CallHandler): Promise<Observable<any>> {
-    const request = context.switchToHttp().getRequest();
-    
-    // Extract workspace reference bound by WorkspaceGuard
-    const workspaceId = request.workspace?.id;
+  async intercept(context: ExecutionContext, next: CallHandler): Promise<Observable<unknown>> {
+    const request = context.switchToHttp().getRequest()
+    const workspaceId = request.workspace?.id || request.user?.workspaceId
     if (!workspaceId) {
-      throw new UnauthorizedException('Request must be scoped within a valid workspace context.');
+      throw new UnauthorizedException('Request must be scoped within a valid workspace context.')
     }
-
-    // Extract targeting device ID
-    const deviceId = request.headers['x-device-id'] || request.query['device_id'];
+    const deviceId = request.headers['x-device-id'] || request.query['device_id']
     if (!deviceId) {
-      throw new BadRequestException('Targeting device header (X-Device-Id) is required.');
+      throw new BadRequestException('Targeting device header (X-Device-Id) is required.')
     }
-
-    // Lookup device config
-    const [deviceRecord] = await this.db
-      .select()
-      .from(devices)
-      .where(and(
-        eq(devices.deviceId, deviceId),
-        eq(devices.workspaceId, workspaceId)
-      ));
-
-    if (!deviceRecord) {
-      throw new UnauthorizedException('Device access unauthorized or does not exist inside workspace context.');
-    }
-
-    // Decrypt credentials
-    const decryptedPassword = this.cryptoService.decrypt(
-      deviceRecord.encCiphertext,
-      deviceRecord.encIv,
-      deviceRecord.encTag
-    );
-
-    // Build authorization credentials
-    const authString = `${deviceRecord.basicAuthUser}:${decryptedPassword}`;
-    const encodedCredentials = Buffer.from(authString).toString('base64');
-
-    // Attach credentials dynamically to outgoing proxy context
-    request.proxyHeaders = {
-      ...request.headers,
-      'Authorization': `Basic ${encodedCredentials}`,
-      'X-Device-Id': deviceRecord.deviceId
-    };
-
-    return next.handle();
+    request.resolvedDevice = await this.devices.resolveCredentials(workspaceId, deviceId)
+    return next.handle()
   }
 }

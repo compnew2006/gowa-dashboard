@@ -1,17 +1,26 @@
-import { 
-  pgTable, 
-  uuid, 
-  text, 
-  timestamp, 
-  jsonb, 
-  boolean, 
-  uniqueIndex, 
-  varchar, 
-  integer, 
+import {
+  pgTable,
+  uuid,
+  text,
+  timestamp,
+  jsonb,
+  boolean,
+  uniqueIndex,
+  varchar,
+  integer,
   primaryKey,
-  vector,
-  index
-} from 'drizzle-orm/pg-core';
+  index,
+} from 'drizzle-orm/pg-core'
+
+// NOTE: the original scaffold imported `vector` from drizzle-orm/pg-core and
+// declared an `embedding vector(1536)` column + an HNSW index on
+// `messages_history`. That required the `pgvector` Postgres extension, which
+// is not installed on this machine and would need a brew install + Postgres
+// restart to add. The embedding column fed an AI enrichment worker that
+// called a non-existent model (`gemini-3.6-flash`). Both have been removed so
+// the schema runs on stock Postgres 13+ (only `gen_random_uuid()` is needed,
+// which is built-in since PG13). Re-add the column + extension only if you
+// revive semantic search with a real embedding pipeline.
 
 // ==========================================
 // 1. WORKSPACE & TENANCY LAYER
@@ -25,7 +34,7 @@ export const workspaces = pgTable('workspaces', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   slugUniqueIdx: uniqueIndex('workspace_slug_unique_idx').on(table.slug),
-}));
+}))
 
 export const workspaceMembers = pgTable('workspace_members', {
   workspaceId: uuid('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }).notNull(),
@@ -34,7 +43,7 @@ export const workspaceMembers = pgTable('workspace_members', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   pk: primaryKey({ columns: [table.workspaceId, table.userId] }),
-}));
+}))
 
 // ==========================================
 // 2. IDENTITY & ROLE-BASED ACCESS CONTROL
@@ -46,7 +55,7 @@ export const roles = pgTable('roles', {
   permissions: text('permissions').array().notNull(), // e.g. ['chats:read', 'chats:write', 'contacts:manage', 'devices:admin']
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+})
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -59,19 +68,23 @@ export const users = pgTable('users', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   emailUniqueIdx: uniqueIndex('user_email_unique_idx').on(table.email),
-}));
+}))
 
 export const refreshTokens = pgTable('refresh_tokens', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   tokenHash: text('token_hash').notNull(),
   familyId: uuid('family_id').notNull(),
-  replacedByTokenId: uuid('replaced_by_token_id'), // Self-reference or tracker for reuse detection
+  // Self-reference: the new token that replaced this one. Enforced as a real FK now.
+  replacedByTokenId: uuid('replaced_by_token_id'),
   ipAddress: varchar('ip_address', { length: 45 }),
   isRevoked: boolean('is_revoked').default(false).notNull(),
   expiresAt: timestamp('expires_at').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  tokenHashIdx: uniqueIndex('refresh_token_hash_idx').on(table.tokenHash),
+  familyIdx: index('refresh_token_family_idx').on(table.familyId),
+}))
 
 // ==========================================
 // 3. WHATSAPP SESSION & DEVICE CONFIGURATION
@@ -92,7 +105,7 @@ export const devices = pgTable('devices', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   deviceWorkspaceIdx: uniqueIndex('device_id_workspace_idx').on(table.deviceId, table.workspaceId),
-}));
+}))
 
 export const deviceMembers = pgTable('device_members', {
   deviceId: uuid('device_id').references(() => devices.id, { onDelete: 'cascade' }).notNull(),
@@ -100,7 +113,7 @@ export const deviceMembers = pgTable('device_members', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   pk: primaryKey({ columns: [table.deviceId, table.userId] }),
-}));
+}))
 
 // ==========================================
 // 4. CRM CLIENT & CONVERSATION SEGMENTS
@@ -114,13 +127,17 @@ export const contacts = pgTable('contacts', {
   phoneNumber: varchar('phone_number', { length: 30 }).notNull(),
   email: varchar('email', { length: 255 }),
   notes: text('notes'),
+  // The gowa device_id this contact was synced from (null = manually created).
+  // Lets us re-sync without losing user edits to name/notes/email/assignedUserId.
+  sourceDeviceId: varchar('source_device_id', { length: 100 }),
   assignedUserId: uuid('assigned_user_id').references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   contactJidWorkspaceIdx: uniqueIndex('contact_jid_workspace_idx').on(table.jid, table.workspaceId),
   assignedUserIdx: index('contact_assigned_user_idx').on(table.assignedUserId),
-}));
+  sourceDeviceIdx: index('contact_source_device_idx').on(table.workspaceId, table.sourceDeviceId),
+}))
 
 export const tags = pgTable('tags', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -128,14 +145,14 @@ export const tags = pgTable('tags', {
   name: varchar('name', { length: 50 }).notNull(),
   color: varchar('color', { length: 20 }).default('#CCCCCC').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+})
 
 export const contactTags = pgTable('contact_tags', {
   contactId: uuid('contact_id').references(() => contacts.id, { onDelete: 'cascade' }).notNull(),
   tagId: uuid('tag_id').references(() => tags.id, { onDelete: 'cascade' }).notNull(),
 }, (table) => ({
   pk: primaryKey({ columns: [table.contactId, table.tagId] }),
-}));
+}))
 
 // ==========================================
 // 5. CHAT TELEMETRY, MUTATIONS & HISTORIC INDEX
@@ -154,7 +171,7 @@ export const chatsMetadata = pgTable('chats_metadata', {
 }, (table) => ({
   chatJidDeviceIdx: uniqueIndex('chat_jid_device_idx').on(table.jid, table.deviceId),
   workspaceJidIdx: index('chat_workspace_jid_idx').on(table.workspaceId, table.jid),
-}));
+}))
 
 export const chatReadCursors = pgTable('chat_read_cursors', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -166,7 +183,7 @@ export const chatReadCursors = pgTable('chat_read_cursors', {
   lastReadMessageId: varchar('last_read_message_id', { length: 255 }),
 }, (table) => ({
   userReadCursorIdx: uniqueIndex('user_read_cursor_idx').on(table.userId, table.chatJid, table.deviceId),
-}));
+}))
 
 export const messagesHistory = pgTable('messages_history', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -179,12 +196,11 @@ export const messagesHistory = pgTable('messages_history', {
   messageType: varchar('message_type', { length: 30 }).notNull(), // 'TEXT', 'IMAGE', 'VIDEO', 'DOCUMENT', 'STICKER'
   status: varchar('status', { length: 20 }).notNull(), // 'SENT', 'DELIVERED', 'READ', 'FAILED'
   contentSummary: text('content_summary'), // Non-PII sanitised copy or safe preview text
-  embedding: vector('embedding', { dimensions: 1536 }), // Semantic vector for advanced analysis & semantic search
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   msgHistoryIdIdx: uniqueIndex('msg_history_id_idx').on(table.messageId),
-  vectorIndex: index('msg_vector_idx').using('hnsw', table.embedding),
-}));
+  workspaceJidCreatedIdx: index('msg_workspace_jid_created_idx').on(table.workspaceId, table.jid, table.createdAt),
+}))
 
 // ==========================================
 // 6. BROADCAST CAMPAIGN AUTOMATION
@@ -202,7 +218,7 @@ export const campaigns = pgTable('campaigns', {
   scheduledAt: timestamp('scheduled_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+})
 
 export const campaignRecipients = pgTable('campaign_recipients', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -211,7 +227,7 @@ export const campaignRecipients = pgTable('campaign_recipients', {
   status: varchar('status', { length: 20 }).default('PENDING').notNull(), // 'PENDING', 'SENT', 'FAILED'
   errorMessage: text('error_message'),
   sentAt: timestamp('sent_at'),
-});
+})
 
 // ==========================================
 // 7. HISTORIC SECURITY AUDITING
@@ -228,7 +244,7 @@ export const auditLogs = pgTable('audit_logs', {
   ipAddress: varchar('ip_address', { length: 45 }).notNull(),
   userAgent: text('user_agent'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+})
 
 // ==========================================
 // 8. RICH MEDIA ASSETS STORE
@@ -243,4 +259,4 @@ export const mediaAssets = pgTable('media_assets', {
   storagePath: text('storage_path').notNull(), // Secure Object Storage pointer
   uploaderUserId: uuid('uploader_user_id').references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+})
