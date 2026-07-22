@@ -15,7 +15,7 @@ import {
   ScrollText,
   Contact,
 } from 'lucide-react'
-import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Logo } from '@/components/layout/logo'
 import { ThemeToggle } from '@/components/layout/theme-toggle'
 import { LanguageToggle } from '@/components/layout/language-toggle'
@@ -128,7 +128,7 @@ function NavContent({
 }
 
 export function AppShell() {
-  const { language } = useTranslation()
+  const { t, language } = useTranslation()
   const isRtl = language === 'ar' || language === 'ur'
   const status = useConnection((state) => state.status)
   const location = useLocation()
@@ -142,10 +142,6 @@ export function AppShell() {
         <Loader2 className="text-muted-foreground size-6 animate-spin" />
       </div>
     )
-  }
-
-  if (status !== 'connected') {
-    return <Navigate to="/connect" replace />
   }
 
   return (
@@ -220,6 +216,19 @@ export function AppShell() {
             <UserMenu />
           </div>
         </header>
+        {/* Non-blocking banner: the gowa connection is no longer a routing
+            gate, so an authenticated-but-unconnected user can still browse;
+            this slim row nudges them toward Settings to configure it. The
+            booting branch already returned above, so reaching here means the
+            probe resolved to a non-connected state. */}
+        {status !== 'connected' && (
+          <div className="bg-muted text-muted-foreground flex items-center justify-center gap-2 px-4 py-1.5 text-center text-xs text-start ltr:text-left rtl:text-right">
+            <span>{t('Not connected to a gowa server')}</span>
+            <Link to="/settings" className="underline underline-offset-2 hover:text-foreground">
+              {t('Open Settings')}
+            </Link>
+          </div>
+        )}
         {/* Every page is a full-bleed surface that owns the viewport below
             the top bar: `<main>` provides no padding and no centered column;
             each page renders its own single bg-card rounded surface that

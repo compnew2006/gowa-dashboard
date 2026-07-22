@@ -160,6 +160,12 @@ export const translations: Record<Language, Record<string, string>> = {
     'Version': 'Version',
     'Device OS name': 'Device OS name',
     'Max image / file / video': 'Max image / file / video',
+
+    // Unified login gate — app-shell banner + user menu
+    'Not connected to a gowa server': 'Not connected to a gowa server',
+    'Open Settings': 'Open Settings',
+    'Not signed in': 'Not signed in',
+    'Log out': 'Log out',
   },
   ar: {
     // Nav / Sidebar

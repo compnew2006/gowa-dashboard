@@ -10,7 +10,6 @@ import { useDeviceStore } from '@/stores/device'
 import { useI18nStore } from '@/stores/i18n'
 import AccountPage from '@/pages/account'
 import ChatsPage from '@/pages/chats'
-import ConnectPage from '@/pages/connect'
 import DashboardPage from '@/pages/dashboard'
 import GroupsPage from '@/pages/groups'
 import LoginPage from '@/pages/login'
@@ -84,25 +83,30 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/connect" element={<ConnectPage />} />
       <Route path="/login" element={<LoginPage />} />
-      <Route element={<AppShell />}>
-        <Route path="/" element={<Navigate to="/chats" replace />} />
-        <Route path="/devices" element={<DashboardPage />} />
-        <Route path="/messaging" element={<MessagingPage />} />
-        <Route path="/send" element={<Navigate to="/messaging" replace />} />
-        <Route path="/messages" element={<Navigate to="/messaging" replace />} />
-        <Route path="/groups" element={<GroupsPage />} />
-        <Route path="/chats" element={<ChatsPage />} />
-        <Route path="/account" element={<AccountPage />} />
-        <Route path="/misc" element={<MiscPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        {/* CRM routes — require JWT auth, layered on top of the gowa connection */}
-        <Route element={<RequireAuth />}>
+      <Route element={<RequireAuth />}>
+        <Route element={<AppShell />}>
+          <Route path="/" element={<Navigate to="/chats" replace />} />
+          <Route path="/devices" element={<DashboardPage />} />
+          <Route path="/messaging" element={<MessagingPage />} />
+          <Route path="/send" element={<Navigate to="/messaging" replace />} />
+          <Route path="/messages" element={<Navigate to="/messaging" replace />} />
+          <Route path="/groups" element={<GroupsPage />} />
+          <Route path="/chats" element={<ChatsPage />} />
+          <Route path="/account" element={<AccountPage />} />
+          <Route path="/misc" element={<MiscPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          {/* CRM routes — now plain children; the outer RequireAuth gates the
+              whole app, so no inner wrapper is needed. */}
           <Route path="/crm" element={<CrmDashboardPage />} />
           <Route path="/crm/users" element={<CrmUsersPage />} />
           <Route path="/crm/contacts" element={<CrmContactsPage />} />
           <Route path="/crm/audit" element={<CrmAuditPage />} />
+          {/* Backward-compat: stale /connect bookmarks redirect to Settings.
+              Lives inside the gated group so anonymous /connect hits are
+              caught by the outer RequireAuth and sent to /login, not bounced
+              through /settings. */}
+          <Route path="/connect" element={<Navigate to="/settings" replace />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

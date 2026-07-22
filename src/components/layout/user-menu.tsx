@@ -1,4 +1,6 @@
+import { useNavigate } from 'react-router-dom'
 import { LogOut, UserRound } from 'lucide-react'
+import { logout as crmLogout } from '@/api/crm/auth'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -8,19 +10,31 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useAuthStore } from '@/stores/auth'
 import { useConnection } from '@/stores/connection'
+import { useTranslation } from '@/stores/i18n'
 
 /**
- * Top-bar user menu. Shows the basic-auth username as a chip; the dropdown
- * offers a single Log out action that clears the stored connection (URL +
- * credentials) and returns the user to /connect via the connection gate.
+ * Top-bar user menu. Shows the signed-in CRM user (full name, falling back to
+ * email) as a chip; the gowa baseUrl is kept as a secondary muted line for
+ * operator context. The single Log out action ends the unified JWT session:
+ * best-effort CRM logout, clear the auth store, and return to /login. The gowa
+ * connection config is intentionally preserved so the next login restores the
+ * server/username without re-entry.
  */
 export function UserMenu() {
-  const username = useConnection((state) => state.username)
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const user = useAuthStore((state) => state.user)
   const baseUrl = useConnection((state) => state.baseUrl)
-  const disconnect = useConnection((state) => state.disconnect)
 
-  const label = username || 'Not signed in'
+  const label = user?.fullName ?? user?.email ?? t('Not signed in')
+
+  const onLogout = async () => {
+    await crmLogout()
+    useAuthStore.getState().logout()
+    navigate('/login')
+  }
 
   return (
     <DropdownMenu>
@@ -40,9 +54,9 @@ export function UserMenu() {
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive" onClick={() => disconnect()}>
+        <DropdownMenuItem variant="destructive" onClick={onLogout}>
           <LogOut className="size-4" />
-          Log out
+          {t('Log out')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

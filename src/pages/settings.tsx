@@ -3,6 +3,7 @@ import { PageSurface } from '@/components/shared/page-surface'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ConnectionForm } from '@/features/session/connection-form'
 import { useAppInfo } from '@/hooks/use-app-info'
 import { formatBytes } from '@/lib/format'
 import { useConnection } from '@/stores/connection'
@@ -10,8 +11,6 @@ import { useTranslation } from '@/stores/i18n'
 
 export default function SettingsPage() {
   const { t } = useTranslation()
-  const baseUrl = useConnection((state) => state.baseUrl)
-  const username = useConnection((state) => state.username)
   const disconnect = useConnection((state) => state.disconnect)
   const { data: info, isLoading: infoLoading, error: infoError } = useAppInfo()
 
@@ -28,15 +27,8 @@ export default function SettingsPage() {
           <CardTitle>{t('Connection')}</CardTitle>
           <CardDescription>{t('Where this dashboard sends its requests')}</CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3 text-sm">
-          <div className="flex justify-between gap-4">
-            <span className="text-muted-foreground">{t('Server')}</span>
-            <span className="truncate font-mono">{baseUrl}</span>
-          </div>
-          <div className="flex justify-between gap-4">
-            <span className="text-muted-foreground">{t('Username')}</span>
-            <span className="font-mono">{username || t('— (no basic auth)')}</span>
-          </div>
+        <CardContent className="flex flex-col gap-4 text-sm">
+          <ConnectionForm />
           <div>
             <Button variant="outline" size="sm" onClick={disconnect}>
               {t('Disconnect')}
