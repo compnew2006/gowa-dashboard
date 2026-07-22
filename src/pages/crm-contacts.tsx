@@ -1,6 +1,17 @@
-import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Contact, Loader2, Pencil, Phone, Plus, RefreshCw, Search, Trash2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Contact,
+  Loader2,
+  Pencil,
+  Phone,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { PageSurface } from '@/components/shared/page-surface'
 import { PageHeader } from '@/components/shared/page-header'
@@ -160,12 +171,27 @@ export default function CrmContactsPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [syncDevice, setSyncDevice] = useState<string>('all')
+  const [pageSize, setPageSize] = useState(25)
+  const [page, setPage] = useState(0)
   const debounced = useDebounce(search, 300)
 
   const contacts = useQuery({
-    queryKey: ['crm', 'contacts', debounced],
-    queryFn: () => listContacts({ search: debounced || undefined, limit: 100 }),
+    queryKey: ['crm', 'contacts', debounced, pageSize, page],
+    queryFn: () =>
+      listContacts({ search: debounced || undefined, limit: pageSize, offset: page * pageSize }),
+    placeholderData: keepPreviousData,
   })
+
+  const total = contacts.data?.total ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const rangeFrom = total === 0 ? 0 : page * pageSize + 1
+  const rangeTo = Math.min((page + 1) * pageSize, total)
+
+  // Clamp the page if the result set shrinks (e.g. after a delete or a
+  // narrower search) so the user is never stranded on an empty page.
+  useEffect(() => {
+    if (page > totalPages - 1) setPage(totalPages - 1)
+  }, [page, totalPages])
 
   // gowa devices for the sync picker. useDevices returns gowa's device list
   // (the actual paired accounts: egypt, Saudi, …).
@@ -262,7 +288,10 @@ export default function CrmContactsPage() {
           <Input
             placeholder={t('Search by name, phone, or JID…')}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(0)
+            }}
             className="pl-9"
           />
         </div>
@@ -287,8 +316,31 @@ export default function CrmContactsPage() {
 
         {contacts.data && contacts.data.results.length > 0 && (
           <div className="flex flex-col gap-2">
-            <div className="text-muted-foreground text-xs">
-              {contacts.data.total} {t('contacts')}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-muted-foreground text-xs">
+                {total === 0
+                  ? `0 ${t('contacts')}`
+                  : `${t('Showing')} ${rangeFrom}–${rangeTo} ${t('of')} ${total}`}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground text-xs">{t('Per page')}</span>
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={(v) => {
+                    setPageSize(Number(v))
+                    setPage(0)
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[4.5rem]" aria-label={t('Per page')}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             {contacts.data.results.map((c) => (
               <Card key={c.id}>
@@ -335,6 +387,31 @@ export default function CrmContactsPage() {
                 </CardContent>
               </Card>
             ))}
+            <div className="flex items-center justify-between gap-3 pt-1">
+              <span className="text-muted-foreground text-xs">
+                {t('Page')} {page + 1} {t('of')} {totalPages}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0 || contacts.isFetching}
+                >
+                  <ChevronLeft className="size-4" />
+                  {t('Back')}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={page >= totalPages - 1 || contacts.isFetching}
+                >
+                  {t('Next')}
+                  <ChevronRight className="size-4" />
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </div>
