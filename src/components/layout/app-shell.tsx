@@ -222,7 +222,10 @@ export function AppShell() {
             booting branch already returned above, so reaching here means the
             probe resolved to a non-connected state. */}
         {status !== 'connected' && (
-          <div className="bg-muted text-muted-foreground flex items-center justify-center gap-2 px-4 py-1.5 text-center text-xs text-start ltr:text-left rtl:text-right">
+          <div
+            role="status"
+            className="bg-muted text-muted-foreground flex items-center justify-center gap-2 px-4 py-1.5 text-center text-xs text-start ltr:text-left rtl:text-right"
+          >
             <span>{t('Not connected to a gowa server')}</span>
             <Link to="/settings" className="underline underline-offset-2 hover:text-foreground">
               {t('Open Settings')}
@@ -230,15 +233,17 @@ export function AppShell() {
           </div>
         )}
         {/* Every page is a full-bleed surface that owns the viewport below
-            the top bar: `<main>` provides no padding and no centered column;
-            each page renders its own single bg-card rounded surface that
-            fills the height and handles its own internal padding/scroll.
-            `/chats` was the first page to use this layout; it is now global.
-            The `.stagger` entrance is preserved on the surface wrapper. */}
+            the top bar: `<main>` is `flex-1` inside the `flex-col` shell
+            (header + optional banner + main), and the surface wrapper is
+            `flex-1 min-h-0` so it takes whatever vertical space remains AFTER
+            the banner (when shown) instead of a fixed `h-[calc(100svh-...)`
+            that would overflow by the banner height for the unconnected users
+            the banner targets. `overflow-hidden` still constrains the chat
+            surface, and `PageSurface` fills via `h-full`. */}
         <main className="flex-1">
           <div
             key={location.pathname}
-            className="stagger h-[calc(100svh-3.5rem)] overflow-hidden p-3 md:p-4"
+            className="stagger flex-1 min-h-0 overflow-hidden p-3 md:p-4"
           >
             <Outlet />
           </div>

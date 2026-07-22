@@ -166,6 +166,11 @@ export const translations: Record<Language, Record<string, string>> = {
     'Open Settings': 'Open Settings',
     'Not signed in': 'Not signed in',
     'Log out': 'Log out',
+    // Unified login gate — Connection form + Settings
+    'Username': 'Username',
+    'Password': 'Password',
+    'Connect': 'Connect',
+    'This server does not expose /app/info yet (needs the cross-origin enablers update).': 'This server does not expose /app/info yet (needs the cross-origin enablers update).',
   },
   ar: {
     // Nav / Sidebar
@@ -323,6 +328,17 @@ export const translations: Record<Language, Record<string, string>> = {
     'Version': 'الإصدار الحالي',
     'Device OS name': 'اسم نظام تشغيل الجهاز',
     'Max image / file / video': 'الحد الأقصى للصورة / الملف / الفيديو',
+
+    // Unified login gate — app-shell banner + user menu
+    'Not connected to a gowa server': 'غير متصل بخادم gowa',
+    'Open Settings': 'فتح الإعدادات',
+    'Not signed in': 'غير مسجل الدخول',
+    'Log out': 'تسجيل الخروج',
+    // Unified login gate — Connection form + Settings
+    'Username': 'اسم المستخدم',
+    'Password': 'كلمة المرور',
+    'Connect': 'اتصال',
+    'This server does not expose /app/info yet (needs the cross-origin enablers update).': 'لا يكشف هذا الخادم عن /app/info بعد (يحتاج إلى تحديث ممكّنات cross-origin).',
   },
   bn: {
     // Nav / Sidebar
@@ -472,6 +488,17 @@ export const translations: Record<Language, Record<string, string>> = {
     'Version': 'সংস্করণ',
     'Device OS name': 'ডিভাইস ওএস নাম',
     'Max image / file / video': 'সর্বোচ্চ ছবি / ফাইল / ভিডিও',
+
+    // Unified login gate — app-shell banner + user menu
+    'Not connected to a gowa server': 'একটি gowa সার্ভারের সাথে সংযুক্ত নয়',
+    'Open Settings': 'সেটিংস খুলুন',
+    'Not signed in': 'সাইন ইন করা নেই',
+    'Log out': 'লগ আউট',
+    // Unified login gate — Connection form + Settings
+    'Username': 'ব্যবহারকারীর নাম',
+    'Password': 'পাসওয়ার্ড',
+    'Connect': 'সংযোগ করুন',
+    'This server does not expose /app/info yet (needs the cross-origin enablers update).': 'এই সার্ভারটি এখনও /app/info প্রকাশ করে না (cross-origin enablers আপডেট প্রয়োজন)।',
   },
   ur: {
     // Nav / Sidebar
@@ -621,6 +648,17 @@ export const translations: Record<Language, Record<string, string>> = {
     'Version': 'موجودہ ورژن',
     'Device OS name': 'ڈیوائس کا OS نام',
     'Max image / file / video': 'زیادہ سے زیادہ تصویر / فائل / ویڈیو',
+
+    // Unified login gate — app-shell banner + user menu
+    'Not connected to a gowa server': 'gowa سرور سے منسلک نہیں ہے',
+    'Open Settings': 'سیٹنگز کھولیں',
+    'Not signed in': 'سائن اِن نہیں ہے',
+    'Log out': 'لاگ آؤٹ',
+    // Unified login gate — Connection form + Settings
+    'Username': 'صارف کا نام',
+    'Password': 'پاس ورڈ',
+    'Connect': 'منسلک کریں',
+    'This server does not expose /app/info yet (needs the cross-origin enablers update).': 'یہ سرور ابھی تک /app/info ظاہر نہیں کرتا (cross-origin enablers اپ ڈیٹ کی ضرورت ہے)۔',
   },
   hi: {
     // Nav / Sidebar
@@ -770,6 +808,17 @@ export const translations: Record<Language, Record<string, string>> = {
     'Version': 'संस्करण',
     'Device OS name': 'उपकरण ओएस नाम',
     'Max image / file / video': 'अधिकतम छवि / फ़ाइल / वीडियो',
+
+    // Unified login gate — app-shell banner + user menu
+    'Not connected to a gowa server': 'gowa सर्वर से कनेक्ट नहीं है',
+    'Open Settings': 'सेटिंग्स खोलें',
+    'Not signed in': 'साइन इन नहीं है',
+    'Log out': 'लॉग आउट',
+    // Unified login gate — Connection form + Settings
+    'Username': 'उपयोगकर्ता नाम',
+    'Password': 'पासवर्ड',
+    'Connect': 'कनेक्ट करें',
+    'This server does not expose /app/info yet (needs the cross-origin enablers update).': 'यह सर्वर अभी तक /app/info प्रकट नहीं करता (cross-origin enablers अपडेट की आवश्यकता है)।',
   }
 }
 

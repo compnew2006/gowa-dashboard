@@ -30,8 +30,13 @@ export function UserMenu() {
 
   const label = user?.fullName ?? user?.email ?? t('Not signed in')
 
-  const onLogout = async () => {
-    await crmLogout()
+  const onLogout = () => {
+    // Best-effort CRM logout is fire-and-forget: it inherits a 30s axios
+    // timeout and self-swallows errors (see src/api/crm/auth.ts). The
+    // security-critical local teardown below must run immediately, without
+    // waiting on the network. `crmLogout` already catches internally; the
+    // trailing `.catch` is belt-and-suspenders against a floating promise.
+    crmLogout().catch(() => {})
     useAuthStore.getState().logout()
     navigate('/login')
   }

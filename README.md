@@ -38,7 +38,7 @@ npm run dev
 
 Then connect the app to your server, either way:
 
-- **Directly** — enter `http://localhost:3000` on the connect screen (needs a gowa build with the CORS features above).
+- **Directly** — enter `http://localhost:3000` on the Settings page (needs a gowa build with the CORS features above).
 - **Via the dev proxy** — enter `http://localhost:5173/gowa` instead; Vite forwards everything (WebSocket included) to `VITE_DEFAULT_SERVER_URL`, so CORS doesn't matter.
 
 Other scripts: `npm run build` (single-file production build into `dist/index.html`), `typecheck`, `lint`, `format`, `preview`.

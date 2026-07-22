@@ -102,13 +102,12 @@ backend/                  # OPTIONAL NestJS auth/proxy (independent of src/, run
 
 ### Core Pages & Route Mappings
 
-- **`pages/connect.tsx`**: Login/connection screen using Basic Auth credentials store.
 - **`pages/dashboard.tsx`**: Home dashboard with overall device connection metrics and QR session scanning.
 - **`pages/chats.tsx`**: Conversation interface featuring a full-bleed responsive master-detail layout.
 - **`pages/messaging.tsx`**: Bulk/workspace messaging playground for single-recipient quick sends and bulk target broadcasts.
 - **`pages/groups.tsx`**: Groups dashboard to view, select, and interact with WhatsApp group channels.
 - **`pages/account.tsx`**: User profile details retrieved from the API connection.
-- **`pages/settings.tsx`**: Connection server URLs, credential verification state, and server configuration panel.
+- **`pages/settings.tsx`**: Connection management hub — the editable Connection form (mounted from `features/session/connection-form.tsx`) for gowa server URL + basic-auth username/password with connect-on-submit and credential verification state, the Disconnect action, and the Server (`GET /app/info`) card (version, OS, media size limits). The unified login gate's connection setup lives here; the deleted `pages/connect.tsx` is gone.
 
 **Request flow that every action form follows** (mirror it for new endpoints):
 
@@ -122,7 +121,9 @@ backend/                  # OPTIONAL NestJS auth/proxy (independent of src/, run
 - `Authorization: Basic <base64(user:pass)>` from `useConnection`.
 - `X-Device-Id: <encodeURIComponent(deviceId)>` from `useDeviceStore`.
 - The cURL renderer in `lib/curl.ts` mirrors these headers — if you change one, change the other.
-- A 401 from anywhere flips `useConnection` to `unauthorized`, which routes the user to `/connect`.
+- **Two distinct 401 paths** (do not conflate them):
+  - **gowa 401** (any request through `lib/http.ts`): the response interceptor calls `useConnection.getState().markUnauthorized()`, flipping `useConnection` to `unauthorized`. There is NO redirect — pages stay reachable, and the app-shell banner surfaces "Not connected to a gowa server" until the user fixes the connection on `/settings`.
+  - **CRM 401** (any request through `lib/api.ts`, the NestJS axios client): the response interceptor calls `useAuthStore.getState().logout()`, which clears the JWT. Because the unified JWT gate (`RequireAuth`) now wraps the whole `AppShell`, clearing it redirects the user to `/login`.
 
 **WebSocket** (`lib/ws.ts`): `wsClient.sync()` reconciles the socket against `useConnection` + `useDeviceStore`. Credentials go in the **query string** (`?device_id=&authorization=`) because browsers can't set headers on `ws://`. Reconnect uses `lib/backoff.ts`. Events fan out via the tiny pub/sub in `lib/events.ts` (`onWsEvent` / `emitWsEvent`); `App.tsx` is the only subscriber that mutates query cache.
 
