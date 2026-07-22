@@ -9,6 +9,7 @@ export interface CrmContact {
   notes: string | null
   assignedUserId: string | null
   sourceDeviceId: string | null
+  sourceDeviceIds: string[] | null
   createdAt: string
   updatedAt: string
 }

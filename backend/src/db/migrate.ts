@@ -132,6 +132,7 @@ CREATE TABLE IF NOT EXISTS contacts (
   email varchar(255),
   notes text,
   source_device_id varchar(100),
+  source_device_ids text[],
   assigned_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
@@ -139,9 +140,19 @@ CREATE TABLE IF NOT EXISTS contacts (
 CREATE UNIQUE INDEX IF NOT EXISTS contact_jid_workspace_idx ON contacts(jid, workspace_id);
 CREATE INDEX IF NOT EXISTS contact_assigned_user_idx ON contacts(assigned_user_id);
 
--- Idempotent column add + index for the source_device_id column (added in v0.2).
+-- Idempotent column adds for existing installs.
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS source_device_id varchar(100);
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS source_device_ids text[];
 CREATE INDEX IF NOT EXISTS contact_source_device_idx ON contacts(workspace_id, source_device_id);
+
+-- Multi-device origin set (added in v0.3). Tracks every device a contact
+-- appears on so the same contact synced from 2-3 devices stays ONE row.
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS source_device_ids text[];
+CREATE INDEX IF NOT EXISTS contact_source_devices_gin_idx ON contacts USING gin (source_device_ids);
+-- Backfill: seed the array from the pre-existing single-device column.
+UPDATE contacts
+  SET source_device_ids = ARRAY[source_device_id]
+  WHERE source_device_ids IS NULL AND source_device_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS tags (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

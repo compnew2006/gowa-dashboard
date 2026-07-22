@@ -299,11 +299,16 @@ export default function CrmContactsPage() {
                       <Badge variant="outline" className="font-mono text-xs">
                         {c.jid}
                       </Badge>
-                      {c.sourceDeviceId && (
-                        <Badge variant="secondary" className="text-xs">
-                          {t('from')} {c.sourceDeviceId}
+                      {(c.sourceDeviceIds && c.sourceDeviceIds.length > 0
+                        ? c.sourceDeviceIds
+                        : c.sourceDeviceId
+                          ? [c.sourceDeviceId]
+                          : []
+                      ).map((deviceId) => (
+                        <Badge key={deviceId} variant="secondary" className="text-xs">
+                          {t('from')} {deviceId}
                         </Badge>
-                      )}
+                      ))}
                     </div>
                     <div className="text-muted-foreground flex items-center gap-2 text-xs">
                       <Phone className="size-3" />

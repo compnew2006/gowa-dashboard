@@ -128,8 +128,12 @@ export const contacts = pgTable('contacts', {
   email: varchar('email', { length: 255 }),
   notes: text('notes'),
   // The gowa device_id this contact was synced from (null = manually created).
-  // Lets us re-sync without losing user edits to name/notes/email/assignedUserId.
+  // Preserved on re-sync so the origin is stable.
   sourceDeviceId: varchar('source_device_id', { length: 100 }),
+  // Every gowa device_id this contact appears on (deduped set). The same
+  // contact synced from 2-3 devices stays a SINGLE row; each device is unioned
+  // here so we can show "from egypt, Saudi" badges.
+  sourceDeviceIds: text('source_device_ids').array(),
   assignedUserId: uuid('assigned_user_id').references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),

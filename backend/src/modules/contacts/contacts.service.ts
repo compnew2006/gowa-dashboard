@@ -262,6 +262,7 @@ export class ContactsService {
             name: c.name || null,
             phoneNumber: phoneMatch[1],
             sourceDeviceId: deviceId,
+            sourceDeviceIds: [deviceId],
             updatedAt: new Date(),
           }
         })
@@ -277,11 +278,21 @@ export class ContactsService {
             .onConflictDoUpdate({
               target: [contacts.jid, contacts.workspaceId],
               set: {
-                // Refresh name + phone + source. Preserve email, notes,
-                // assignedUserId (user-edited CRM data).
+                // Refresh name + phone (address book may change). Preserve
+                // email, notes, assignedUserId (user-edited CRM data).
                 name: row.name,
                 phoneNumber: row.phoneNumber,
-                sourceDeviceId: row.sourceDeviceId,
+                // Keep the FIRST device that ever contributed this contact as
+                // the stable "primary" origin.
+                sourceDeviceId: sql`coalesce(${contacts.sourceDeviceId}, excluded.source_device_id)`,
+                // Union this device into the origin set, deduped. Re-syncing
+                // the same device is a no-op; a new device is appended once.
+                sourceDeviceIds: sql`(
+                  select array_agg(distinct e)
+                  from unnest(
+                    array_cat(coalesce(${contacts.sourceDeviceIds}, '{}'::text[]), excluded.source_device_ids)
+                  ) as e
+                )`,
                 updatedAt: new Date(),
               },
             })
